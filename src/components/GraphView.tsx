@@ -166,22 +166,29 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
     return { nodes: nList, links: lList, nodeMap: nMap };
   }, [ideas, categories, catColorMap, showCategoryLinks]);
 
-  // Configure forces to prevent runaway repulsion
+  // Configure forces to separate main nodes and provide spacious layout
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const applyForces = () => {
       if (fgRef.current) {
         const fg = fgRef.current;
         const charge = fg.d3Force("charge");
         if (charge) {
-          charge.strength(-60);
-          charge.distanceMax(200);
+          // Strong repulsion for main category hubs (-420) so they separate widely,
+          // and -140 for regular ideas
+          charge.strength((n: any) => (n.isHub ? -420 : -140));
+          charge.distanceMax(550);
         }
         const link = fg.d3Force("link");
         if (link) {
-          link.distance((l: any) => (l.isCategoryLink ? 60 : 45));
+          // Generous distance between category hubs and their idea children (120px)
+          // and 85px between linked ideas
+          link.distance((l: any) => (l.isCategoryLink ? 120 : 85));
         }
       }
-    }, 100);
+    };
+
+    applyForces();
+    const timer = setTimeout(applyForces, 150);
     return () => clearTimeout(timer);
   }, []);
 
@@ -303,6 +310,17 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
 
   const handleNodeClick = useCallback(
     (node: any) => {
+      // Zoom in a little and center smoothly on the touched/clicked node
+      if (fgRef.current && node.x !== undefined && node.y !== undefined) {
+        fgRef.current.centerAt(node.x, node.y, 600);
+        const currentZoom = fgRef.current.zoom();
+        // Zoom in by ~35% (between 1.8x and 3.2x)
+        const targetZoom = Math.min(Math.max(currentZoom * 1.35, 1.8), 3.2);
+        fgRef.current.zoom(targetZoom, 600);
+      }
+
+      setHoverNode(node);
+
       if (node.isHub) {
         setSelectedCategory(node.categoryName);
       } else if (node.ideaData) {
@@ -402,10 +420,10 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
           enableNodeDrag={!isLocked}
           enablePanInteraction={true}
           enableZoomInteraction={true}
-          warmupTicks={160}
-          cooldownTicks={25}
-          d3AlphaDecay={0.08}
-          d3VelocityDecay={0.75}
+          warmupTicks={180}
+          cooldownTicks={30}
+          d3AlphaDecay={0.06}
+          d3VelocityDecay={0.7}
           onEngineStop={handleEngineStop}
           onNodeDragEnd={handleNodeDragEnd}
           nodeRelSize={4}
