@@ -16,8 +16,10 @@ import {
   Loader2,
   Network,
   Plus,
+  Brain,
   Calendar,
   Compass,
+  ListTodo,
   Search,
   Sparkles,
   ArrowRight,
@@ -28,6 +30,7 @@ import {
   X,
   Layers,
   FolderPlus,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -56,7 +59,7 @@ const TILE_PALETTES = [
   { bg: "#B8375F", text: "#FFFFFF" }, // Rose Crimson
 ];
 
-type TabType = "checkin" | "breakdown" | "tools";
+type TabType = "checkin" | "breakdown" | "todos" | "tools";
 
 export default function HomePage() {
   const { user, loading, getToken } = useAuth();
@@ -150,6 +153,43 @@ export default function HomePage() {
       .filter((i) => i.type === "task" || i.type === "reminder")
       .sort((a, b) => (a.done ? 1 : 0) - (b.done ? 1 : 0) || b.createdAt - a.createdAt);
   }, [ideas]);
+
+  // To-do tab state & helpers
+  const [todoFilter, setTodoFilter] = useState<"all" | "pending" | "completed">("all");
+  const [newTodoInput, setNewTodoInput] = useState("");
+  const [isAddingTodo, setIsAddingTodo] = useState(false);
+  const [todoCategoryFilter, setTodoCategoryFilter] = useState("All");
+
+  const pendingTodosCount = useMemo(() => {
+    return todos.filter((t) => !t.done).length;
+  }, [todos]);
+
+  const completedTodosCount = useMemo(() => {
+    return todos.filter((t) => t.done).length;
+  }, [todos]);
+
+  const displayedTodos = useMemo(() => {
+    return todos.filter((todo) => {
+      if (todoFilter === "pending" && todo.done) return false;
+      if (todoFilter === "completed" && !todo.done) return false;
+      if (todoCategoryFilter !== "All" && todo.category !== todoCategoryFilter) return false;
+      return true;
+    });
+  }, [todos, todoFilter, todoCategoryFilter]);
+
+  const handleAddTodo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTodoInput.trim() || isAddingTodo) return;
+    setIsAddingTodo(true);
+    try {
+      await processDump(`TODO: ${newTodoInput.trim()}`, "text");
+      setNewTodoInput("");
+    } catch (err) {
+      console.error("Failed to add todo:", err);
+    } finally {
+      setIsAddingTodo(false);
+    }
+  };
 
   // Time of day greeting
   const timeGreeting = useMemo(() => {
@@ -587,7 +627,231 @@ export default function HomePage() {
         )}
 
         {/* =========================================================================
-            TAB 3: TOOLS (Categories & AI Look up Search Bar)
+            TAB 3: TO-DO LIST (Tasks extracted from Thoughts & Voice Notes)
+            ========================================================================= */}
+        {activeTab === "todos" && (
+          <section className="space-y-6 animate-in fade-in duration-200">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[var(--line)]">
+              <div>
+                <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-[var(--ink)] tracking-tight flex items-center gap-2.5">
+                  <ListTodo className="w-8 h-8 text-[var(--pen)]" />
+                  <span>To-Do List</span>
+                </h2>
+                <p className="text-sm text-[var(--muted)] mt-1">
+                  Action items and tasks extracted by AI from your thoughts, voice notes, and dumps.
+                </p>
+              </div>
+
+              {/* Progress Summary Card */}
+              <div className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-2xl border border-[var(--line)] shadow-sm">
+                <div className="text-right">
+                  <p className="text-xs font-mono font-bold text-[var(--ink)]">
+                    {completedTodosCount} of {todos.length} done
+                  </p>
+                  <p className="text-[11px] font-mono text-[var(--muted)]">
+                    {todos.length > 0 ? Math.round((completedTodosCount / todos.length) * 100) : 0}% completed
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-full border-4 border-[var(--line)] flex items-center justify-center relative overflow-hidden bg-[var(--paper)]">
+                  <span className="text-xs font-mono font-extrabold text-[var(--pen)]">
+                    {todos.length > 0 ? `${Math.round((completedTodosCount / todos.length) * 100)}%` : "0%"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Add To-Do Bar */}
+            <form onSubmit={handleAddTodo} className="bg-white border border-[var(--line)] rounded-[20px] p-2.5 shadow-[var(--shadow)] flex items-center gap-2">
+              <input
+                type="text"
+                value={newTodoInput}
+                onChange={(e) => setNewTodoInput(e.target.value)}
+                placeholder="Add a new task (e.g., 'Email professor Lee about group project before Friday')..."
+                className="flex-1 px-3 py-2 text-sm bg-transparent border-0 focus:outline-none text-[var(--ink)] placeholder:text-[var(--muted)]"
+                disabled={isAddingTodo}
+              />
+              <button
+                type="submit"
+                disabled={!newTodoInput.trim() || isAddingTodo}
+                className="btn primary text-xs py-2 px-4 whitespace-nowrap flex items-center gap-1.5"
+              >
+                {isAddingTodo ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Adding...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 stroke-[2.5]" />
+                    <span>Add Task</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Filter Pills */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 p-1 bg-white border border-[var(--line)] rounded-full shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setTodoFilter("all")}
+                  className={`px-3 py-1 rounded-full text-xs font-mono font-semibold transition-colors ${
+                    todoFilter === "all"
+                      ? "bg-[var(--pen)] text-white shadow-sm"
+                      : "text-[var(--muted)] hover:text-[var(--ink)]"
+                  }`}
+                >
+                  All ({todos.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTodoFilter("pending")}
+                  className={`px-3 py-1 rounded-full text-xs font-mono font-semibold transition-colors ${
+                    todoFilter === "pending"
+                      ? "bg-[var(--pen)] text-white shadow-sm"
+                      : "text-[var(--muted)] hover:text-[var(--ink)]"
+                  }`}
+                >
+                  Pending ({pendingTodosCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTodoFilter("completed")}
+                  className={`px-3 py-1 rounded-full text-xs font-mono font-semibold transition-colors ${
+                    todoFilter === "completed"
+                      ? "bg-[var(--pen)] text-white shadow-sm"
+                      : "text-[var(--muted)] hover:text-[var(--ink)]"
+                  }`}
+                >
+                  Done ({completedTodosCount})
+                </button>
+              </div>
+
+              {/* Category Filter Pills if categories exist */}
+              {catNames.length > 0 && (
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs font-mono">
+                  <span className="text-[var(--muted)] text-[11px] mr-1">Category:</span>
+                  <button
+                    type="button"
+                    onClick={() => setTodoCategoryFilter("All")}
+                    className={`px-2.5 py-1 rounded-full transition-colors ${
+                      todoCategoryFilter === "All"
+                        ? "bg-[var(--ink)] text-white font-bold"
+                        : "bg-white border border-[var(--line)] text-[var(--muted)] hover:text-[var(--ink)]"
+                    }`}
+                  >
+                    All
+                  </button>
+                  {catNames.map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setTodoCategoryFilter(cat)}
+                      className={`px-2.5 py-1 rounded-full transition-colors ${
+                        todoCategoryFilter === cat
+                          ? "bg-[var(--ink)] text-white font-bold"
+                          : "bg-white border border-[var(--line)] text-[var(--muted)] hover:text-[var(--ink)]"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Tasks List */}
+            {displayedTodos.length === 0 ? (
+              <div className="bg-white border border-[var(--line)] rounded-[22px] p-10 text-center shadow-sm space-y-3">
+                <div className="w-12 h-12 rounded-full bg-[var(--paper)] text-[var(--muted)] flex items-center justify-center mx-auto">
+                  <CheckSquare className="w-6 h-6" />
+                </div>
+                <h3 className="font-display font-bold text-lg text-[var(--ink)]">
+                  {todoFilter === "completed"
+                    ? "No completed tasks yet"
+                    : todoFilter === "pending"
+                    ? "All caught up! Zero pending tasks"
+                    : "No tasks found"}
+                </h3>
+                <p className="text-xs text-[var(--muted)] max-w-sm mx-auto">
+                  Dump your thoughts or speak into the microphone on the Check-in tab, and AI will automatically detect action items and populate them here.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-white border border-[var(--line)] rounded-[22px] p-5 shadow-[var(--shadow)] divide-y divide-[var(--line)]">
+                {displayedTodos.map((todo) => (
+                  <div
+                    key={todo.id}
+                    className="py-3.5 first:pt-0 last:pb-0 flex items-start gap-3.5 group transition-colors"
+                  >
+                    {/* Interactive Checkbox */}
+                    <button
+                      type="button"
+                      onClick={() => toggleTodoDone(todo.id)}
+                      className="mt-0.5 text-[var(--pen)] hover:scale-110 transition-transform flex-shrink-0"
+                      title={todo.done ? "Mark as pending" : "Mark as done"}
+                    >
+                      {todo.done ? (
+                        <CheckSquare className="w-5 h-5 text-[var(--t-task)]" />
+                      ) : (
+                        <Square className="w-5 h-5 text-[var(--muted)] group-hover:text-[var(--pen)]" />
+                      )}
+                    </button>
+
+                    {/* Content (Clicking opens note detail) */}
+                    <div
+                      className="min-w-0 flex-1 cursor-pointer"
+                      onClick={() => {
+                        setSelectedIdea(todo);
+                        setIsDetailOpen(true);
+                      }}
+                    >
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p
+                          className={`text-sm font-bold leading-snug transition-colors ${
+                            todo.done
+                              ? "line-through text-[var(--muted)]"
+                              : "text-[var(--ink)] group-hover:text-[var(--pen)]"
+                          }`}
+                        >
+                          {todo.title}
+                        </p>
+                        <span className="pill p-task text-[10px] uppercase font-mono">
+                          {todo.category}
+                        </span>
+                      </div>
+                      {todo.summary && (
+                        <p className={`text-xs mt-1 leading-relaxed ${todo.done ? "text-[var(--muted)]/70" : "text-[var(--muted)]"}`}>
+                          {todo.summary}
+                        </p>
+                      )}
+                      <p className="text-[10px] font-mono text-[var(--muted)]/60 mt-1.5 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        <span>Created {ago(todo.createdAt)}</span>
+                      </p>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={() => deleteIdea(todo.id)}
+                        className="p-1.5 rounded-lg text-[var(--muted)] hover:text-red-500 hover:bg-red-50 transition-colors"
+                        title="Delete task"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* =========================================================================
+            TAB 4: TOOLS (Categories & AI Look up Search Bar)
             ========================================================================= */}
         {activeTab === "tools" && (
           <section className="space-y-6 animate-in fade-in duration-200">
@@ -805,10 +1069,10 @@ export default function HomePage() {
       </main>
 
       {/* =========================================================================
-          FIXED BOTTOM NAVIGATION BAR (Matching the screenshots: +, Calendar, Tools)
+          FIXED BOTTOM NAVIGATION BAR: Microphone, Brain, To do, Tools
           ========================================================================= */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[var(--line)] shadow-lg py-2">
-        <div className="max-w-[480px] mx-auto px-6 flex items-center justify-around">
+        <div className="max-w-[480px] mx-auto px-4 flex items-center justify-around">
           {/* Tab 1: Check-in / Microphone Dump */}
           <button
             type="button"
@@ -825,7 +1089,7 @@ export default function HomePage() {
                   : "bg-[var(--paper)] hover:bg-[var(--line)] text-[var(--ink)]"
               }`}
             >
-              <Plus className="w-5 h-5 stroke-[2.5]" />
+              <Mic className="w-5 h-5 stroke-[2.2]" />
             </div>
             <span className="text-[11px] font-mono">Check in</span>
           </button>
@@ -837,7 +1101,7 @@ export default function HomePage() {
             className={`flex flex-col items-center gap-1 transition-colors ${
               activeTab === "breakdown" ? "text-[var(--pen)] font-bold" : "text-[var(--muted)] hover:text-[var(--ink)]"
             }`}
-            title="Obsidian Second Brain Breakdown"
+            title="Second Brain Graph & Breakdown"
           >
             <div
               className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
@@ -846,12 +1110,38 @@ export default function HomePage() {
                   : "bg-[var(--paper)] hover:bg-[var(--line)] text-[var(--ink)]"
               }`}
             >
-              <Calendar className="w-5 h-5" />
+              <Brain className="w-5 h-5" />
             </div>
-            <span className="text-[11px] font-mono">Breakdown</span>
+            <span className="text-[11px] font-mono">Brain</span>
           </button>
 
-          {/* Tab 3: Tools / Categories */}
+          {/* Tab 3: To Do Tab */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("todos")}
+            className={`flex flex-col items-center gap-1 transition-colors ${
+              activeTab === "todos" ? "text-[var(--pen)] font-bold" : "text-[var(--muted)] hover:text-[var(--ink)]"
+            }`}
+            title="Action Items & Tasks"
+          >
+            <div
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all relative ${
+                activeTab === "todos"
+                  ? "bg-[var(--pen)] text-white shadow-md scale-105"
+                  : "bg-[var(--paper)] hover:bg-[var(--line)] text-[var(--ink)]"
+              }`}
+            >
+              <ListTodo className="w-5 h-5" />
+              {pendingTodosCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--pen)] text-white text-[9px] font-mono font-bold flex items-center justify-center border-2 border-white shadow-sm">
+                  {pendingTodosCount}
+                </span>
+              )}
+            </div>
+            <span className="text-[11px] font-mono">To do</span>
+          </button>
+
+          {/* Tab 4: Tools / Categories */}
           <button
             type="button"
             onClick={() => setActiveTab("tools")}
