@@ -32,7 +32,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="light" data-theme="light" style={{ colorScheme: "light" }} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -42,24 +42,27 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap"
         />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        {/* Enforce light theme and clear legacy dark caches immediately before paint */}
+        {/* Pre-paint theme resolution to prevent flash of wrong theme */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              try {
-                document.documentElement.classList.remove('dark');
-                document.documentElement.classList.add('light');
-                document.documentElement.setAttribute('data-theme', 'light');
-                localStorage.removeItem('theme');
-                localStorage.setItem('thinkbox_theme', 'light');
-                if ('caches' in window) {
-                  caches.keys().then(function(keys) {
-                    keys.forEach(function(k) {
-                      if (k !== 'thoughtdump-light-v3') caches.delete(k);
-                    });
-                  });
-                }
-              } catch(e) {}
+              (function() {
+                try {
+                  var stored = localStorage.getItem('thoughtdump_theme');
+                  var isDark = stored === 'dark' || (stored === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                  if (isDark) {
+                    document.documentElement.classList.add('dark');
+                    document.documentElement.classList.remove('light');
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    document.documentElement.style.colorScheme = 'dark';
+                  } else {
+                    document.documentElement.classList.add('light');
+                    document.documentElement.classList.remove('dark');
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    document.documentElement.style.colorScheme = 'light';
+                  }
+                } catch(e) {}
+              })();
             `,
           }}
         />

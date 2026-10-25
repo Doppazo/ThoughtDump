@@ -389,7 +389,7 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
   };
 
   return (
-    <div className="relative w-full h-[calc(100vh-140px)] min-h-[500px] border border-[var(--line)] rounded-[18px] overflow-hidden bg-white shadow-[var(--shadow)] flex">
+    <div className="relative w-full h-[calc(100vh-140px)] min-h-[500px] border border-[var(--line)] rounded-[18px] overflow-hidden bg-[var(--surface)] shadow-[var(--shadow)] flex">
       {/* Canvas Area */}
       <div className="flex-1 relative h-full">
         {/* Graph Controls Toolbar */}
@@ -517,9 +517,10 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
             highlightLinks.has(link) ? 3 : link.width || 1
           }
           linkColor={(link: any) => {
-            if (highlightLinks.has(link)) return "#2645D4";
-            if (hoverNode && !highlightLinks.has(link)) return "rgba(229, 231, 235, 0.25)";
-            return link.color || "rgba(209, 213, 219, 0.6)";
+            const isDark = typeof document !== "undefined" && (document.documentElement.classList.contains("dark") || document.documentElement.getAttribute("data-theme") === "dark");
+            if (highlightLinks.has(link)) return isDark ? "#4F6BFF" : "#2645D4";
+            if (hoverNode && !highlightLinks.has(link)) return isDark ? "rgba(75, 85, 99, 0.2)" : "rgba(229, 231, 235, 0.25)";
+            return link.color || (isDark ? "rgba(100, 116, 139, 0.45)" : "rgba(209, 213, 219, 0.6)");
           }}
           nodePointerAreaPaint={(node: any, color, ctx) => {
             // Generous touch hit-box ensuring clicks & mobile touches always hit
@@ -533,6 +534,8 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
             const isConnected = highlightNodes.has(node.id);
             const isDimmed = hoverNode && !isConnected;
 
+            const isDark = typeof document !== "undefined" && (document.documentElement.classList.contains("dark") || document.documentElement.getAttribute("data-theme") === "dark");
+
             const isHub = node.isHub;
             // Dynamic Obsidian-grade sizing proportional to node connections
             const degree = node.neighbors?.size || 0;
@@ -543,23 +546,24 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
             ctx.beginPath();
             ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI, false);
 
-            // Solid Black Node Color as requested
-            ctx.fillStyle = isDimmed ? "#9CA3AF" : "#111827";
+            // Node Color: Solid black in light mode, luminous light in dark mode
+            const nodeFill = isDark ? "#F1F5F9" : "#111827";
+            ctx.fillStyle = isDimmed ? (isDark ? "#475569" : "#9CA3AF") : nodeFill;
             ctx.fill();
 
             // Distinct category accent ring or active focus outline
             if (isHovered || isConnected) {
-              ctx.strokeStyle = "#2645D4";
+              ctx.strokeStyle = isDark ? "#4F6BFF" : "#2645D4";
               ctx.lineWidth = 3.5 / globalScale;
               ctx.stroke();
             } else if (isHub) {
               // Accent ring around category hubs
-              ctx.strokeStyle = node.catColor || "#4B5563";
+              ctx.strokeStyle = node.catColor || (isDark ? "#94A3B8" : "#4B5563");
               ctx.lineWidth = 2.5 / globalScale;
               ctx.stroke();
             } else {
               // Crisp subtle outline for idea notes
-              ctx.strokeStyle = "#374151";
+              ctx.strokeStyle = isDark ? "#94A3B8" : "#374151";
               ctx.lineWidth = 1 / globalScale;
               ctx.stroke();
             }
@@ -575,7 +579,9 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
               const bHeight = fontSize + 6 / globalScale;
               const labelY = node.y + (radius + 9) / globalScale;
 
-              ctx.fillStyle = isDimmed ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.95)";
+              ctx.fillStyle = isDimmed
+                ? (isDark ? "rgba(21,27,40,0.7)" : "rgba(255,255,255,0.7)")
+                : (isDark ? "rgba(21,27,40,0.92)" : "rgba(255,255,255,0.95)");
               ctx.fillRect(
                 node.x - bWidth / 2,
                 labelY - bHeight / 2,
@@ -583,7 +589,7 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
                 bHeight
               );
 
-              ctx.fillStyle = isDimmed ? "#9CA3AF" : "#111827"; // Crisp black text
+              ctx.fillStyle = isDimmed ? (isDark ? "#64748B" : "#9CA3AF") : (isDark ? "#F8FAFC" : "#111827");
               ctx.fillText(label, node.x, labelY);
             }
           }}

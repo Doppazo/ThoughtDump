@@ -5,7 +5,7 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light !important;
+  color-scheme: light;
   --paper: #F2F4F8;
   --surface: #FFFFFF;
   --ink: #161D2B;
@@ -31,15 +31,55 @@
   --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
-html, body {
-  color-scheme: light !important;
+/* Dark theme variables */
+.dark, [data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #0D111A;
+  --surface: #151B28;
+  --ink: #EDF1F7;
+  --muted: #8A96AA;
+  --line: #242D3F;
+  --dot: #252F42;
+  --pen: #4F6BFF;
+  --pen-soft: #1B2440;
+  --hl: #F5C842;
+  --t-idea: #5B7BFF;
+  --t-idea-bg: #1B2544;
+  --t-task: #2EB875;
+  --t-task-bg: #133324;
+  --t-question: #E59024;
+  --t-question-bg: #332313;
+  --t-reminder: #E85584;
+  --t-reminder-bg: #3B1B27;
+  --t-note: #94A3B8;
+  --t-note-bg: #1A2234;
+  --shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 12px 32px -8px rgba(0, 0, 0, 0.55);
 }
 
-/* Ensure no dark-mode overrides ever apply */
-.dark, [data-theme="dark"] {
-  color-scheme: light !important;
-  background-color: var(--paper) !important;
-  color: var(--ink) !important;
+/* Dark mode utility overrides for legacy white card backgrounds */
+.dark .bg-white,
+[data-theme="dark"] .bg-white {
+  background-color: var(--surface) !important;
+}
+
+.dark .bg-white\/95,
+[data-theme="dark"] .bg-white\/95 {
+  background-color: rgba(21, 27, 40, 0.95) !important;
+}
+
+.dark .bg-white\/90,
+[data-theme="dark"] .bg-white\/90 {
+  background-color: rgba(21, 27, 40, 0.9) !important;
+}
+
+.dark .bg-white\/80,
+[data-theme="dark"] .bg-white\/80 {
+  background-color: rgba(21, 27, 40, 0.8) !important;
+}
+
+.dark .bg-white\/50,
+[data-theme="dark"] .bg-white\/50 {
+  background-color: rgba(21, 27, 40, 0.5) !important;
 }
 
 * {
@@ -158,4 +198,13 @@ button {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(22, 29, 43, 0.3);
+}
+
+.dark ::-webkit-scrollbar-thumb,
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(237, 241, 247, 0.2);
+}
+.dark ::-webkit-scrollbar-thumb:hover,
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(237, 241, 247, 0.35);
 }

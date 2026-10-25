@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 import {
   X,
   Download,
@@ -11,6 +12,9 @@ import {
   User,
   ShieldCheck,
   Check,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
 
 interface SettingsModalProps {
@@ -20,6 +24,7 @@ interface SettingsModalProps {
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { user, signOut, getToken } = useAuth();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const [isExporting, setIsExporting] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -122,19 +127,68 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </button>
           </div>
 
-          {/* Theme display */}
-          <div className="space-y-2">
-            <h4 className="font-mono text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-              Appearance
-            </h4>
-            <div className="p-3.5 rounded-xl border border-[var(--line)] bg-[var(--surface)] flex items-center justify-between">
-              <div>
-                <p className="text-sm font-bold text-[var(--ink)]">Notebook Paper Desk</p>
-                <p className="text-xs text-[var(--muted)]">High-legibility light dot grid canvas</p>
-              </div>
-              <span className="pill p-task flex items-center gap-1">
-                <Check className="w-3 h-3" /> Active
+          {/* Theme / Appearance Toggle */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-mono text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+                Appearance & Theme
+              </h4>
+              <span className="font-mono text-[11px] text-[var(--pen)] capitalize font-bold">
+                {resolvedTheme} mode
               </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2.5">
+              {/* Light Theme Option */}
+              <button
+                type="button"
+                onClick={() => setTheme("light")}
+                className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${
+                  theme === "light"
+                    ? "border-[var(--pen)] bg-[var(--pen-soft)] text-[var(--pen)] shadow-sm ring-2 ring-[var(--pen)]/20"
+                    : "border-[var(--line)] bg-[var(--surface)] text-[var(--muted)] hover:border-[var(--muted)] hover:text-[var(--ink)]"
+                }`}
+              >
+                <Sun className={`w-5 h-5 ${theme === "light" ? "text-[var(--pen)]" : ""}`} />
+                <div className="text-center">
+                  <p className="text-xs font-bold leading-none">Light</p>
+                  <p className="text-[10px] opacity-75 mt-1 font-mono">Notebook</p>
+                </div>
+              </button>
+
+              {/* Dark Theme Option */}
+              <button
+                type="button"
+                onClick={() => setTheme("dark")}
+                className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${
+                  theme === "dark"
+                    ? "border-[var(--pen)] bg-[var(--pen-soft)] text-[var(--pen)] shadow-sm ring-2 ring-[var(--pen)]/20"
+                    : "border-[var(--line)] bg-[var(--surface)] text-[var(--muted)] hover:border-[var(--muted)] hover:text-[var(--ink)]"
+                }`}
+              >
+                <Moon className={`w-5 h-5 ${theme === "dark" ? "text-[var(--pen)]" : ""}`} />
+                <div className="text-center">
+                  <p className="text-xs font-bold leading-none">Dark</p>
+                  <p className="text-[10px] opacity-75 mt-1 font-mono">Obsidian</p>
+                </div>
+              </button>
+
+              {/* System Option */}
+              <button
+                type="button"
+                onClick={() => setTheme("system")}
+                className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${
+                  theme === "system"
+                    ? "border-[var(--pen)] bg-[var(--pen-soft)] text-[var(--pen)] shadow-sm ring-2 ring-[var(--pen)]/20"
+                    : "border-[var(--line)] bg-[var(--surface)] text-[var(--muted)] hover:border-[var(--muted)] hover:text-[var(--ink)]"
+                }`}
+              >
+                <Monitor className={`w-5 h-5 ${theme === "system" ? "text-[var(--pen)]" : ""}`} />
+                <div className="text-center">
+                  <p className="text-xs font-bold leading-none">System</p>
+                  <p className="text-[10px] opacity-75 mt-1 font-mono">Automatic</p>
+                </div>
+              </button>
             </div>
           </div>
 

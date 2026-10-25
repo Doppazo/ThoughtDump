@@ -1,12 +1,12 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 
-type Theme = "light";
+export type Theme = "light" | "dark" | "system";
 
 interface ThemeContextType {
   theme: Theme;
-  resolvedTheme: "light";
+  resolvedTheme: "light" | "dark";
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
 }
@@ -14,27 +14,75 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme] = useState<Theme>("light");
-  const resolvedTheme: "light" = "light";
+  const [theme, setThemeState] = useState<Theme>("light");
+  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
 
-  useEffect(() => {
-    // Force light mode on root element
-    document.documentElement.classList.remove("dark");
-    document.documentElement.classList.add("light");
-    document.documentElement.setAttribute("data-theme", "light");
-    try {
-      localStorage.setItem("thinkbox_theme", "light");
-    } catch {
-      // ignore
+  // Apply theme to document element
+  const applyTheme = useCallback((resolved: "light" | "dark") => {
+    setResolvedTheme(resolved);
+    const root = document.documentElement;
+    if (resolved === "dark") {
+      root.classList.remove("light");
+      root.classList.add("dark");
+      root.setAttribute("data-theme", "dark");
+      root.style.colorScheme = "dark";
+    } else {
+      root.classList.remove("dark");
+      root.classList.add("light");
+      root.setAttribute("data-theme", "light");
+      root.style.colorScheme = "light";
     }
   }, []);
 
-  const setTheme = () => {
-    // Light mode only
+  // Compute resolved theme from current setting
+  const resolveTheme = useCallback((selectedTheme: Theme): "light" | "dark" => {
+    if (selectedTheme === "system") {
+      if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        return "dark";
+      }
+      return "light";
+    }
+    return selectedTheme;
+  }, []);
+
+  // Initialize theme from localStorage or system on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("thoughtdump_theme") as Theme | null;
+      const initialTheme: Theme = stored && ["light", "dark", "system"].includes(stored) ? stored : "light";
+      setThemeState(initialTheme);
+      applyTheme(resolveTheme(initialTheme));
+    } catch {
+      applyTheme("light");
+    }
+  }, [applyTheme, resolveTheme]);
+
+  // Listen to system theme changes if theme is "system"
+  useEffect(() => {
+    if (theme !== "system") return;
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = (e: MediaQueryListEvent) => {
+      applyTheme(e.matches ? "dark" : "light");
+    };
+
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, [theme, applyTheme]);
+
+  const setTheme = (newTheme: Theme) => {
+    setThemeState(newTheme);
+    try {
+      localStorage.setItem("thoughtdump_theme", newTheme);
+    } catch {
+      // ignore
+    }
+    applyTheme(resolveTheme(newTheme));
   };
 
   const toggleTheme = () => {
-    // Light mode only
+    const nextTheme = resolvedTheme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
   };
 
   return (
