@@ -199,10 +199,6 @@ export default function HomePage() {
     return "evening";
   }, []);
 
-  // Days of week indicator
-  const daysOfWeek = ["S", "M", "T", "W", "T", "F", "S"];
-  const currentDayOfWeek = new Date().getDay();
-
   const handleToggleVoice = async () => {
     if (isRecording) {
       const recorded = await stopRecording();
@@ -327,30 +323,7 @@ export default function HomePage() {
             TAB 1: HOW ARE YOU FEELING / SPEECH CAPTURE (Main Check-in Page)
             ========================================================================= */}
         {activeTab === "checkin" && (
-          <section className="flex flex-col items-center max-w-2xl mx-auto space-y-6 pt-2 animate-in fade-in duration-200">
-            {/* Weekday check-in streak circles (matching Image 3) */}
-            <div className="flex items-center justify-center gap-3 py-1">
-              {daysOfWeek.map((day, idx) => {
-                const isToday = idx === currentDayOfWeek;
-                return (
-                  <div key={idx} className="flex flex-col items-center gap-1.5">
-                    <span className="font-mono text-[11px] font-bold text-[var(--muted)]">
-                      {day}
-                    </span>
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center font-mono text-xs transition-all ${
-                        isToday
-                          ? "bg-[var(--pen)] text-white font-bold ring-4 ring-[var(--pen-soft)] shadow-sm"
-                          : "bg-white border border-[var(--line)] text-[var(--muted)]"
-                      }`}
-                    >
-                      {isToday ? <Plus className="w-3.5 h-3.5" /> : idx + 1}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
+          <section className="flex flex-col items-center max-w-2xl mx-auto space-y-6 pt-4 animate-in fade-in duration-200">
             {/* Time-of-day greeting (matching Image 3) */}
             <div className="text-center space-y-1.5 max-w-lg">
               <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-[var(--ink)] tracking-tight">
