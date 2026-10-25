@@ -1,0 +1,517 @@
+<title>Thought Dump</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a notebook desk. The dump box is the one object on top; the brain spreads out below with a side rail for asking and to-dos. */
+:root{
+  --paper:#F2F4F8; --surface:#FFFFFF; --ink:#161D2B; --muted:#596377; --line:#D7DCE6; --dot:#C9D0DC;
+  --pen:#2645D4; --pen-soft:#E3E8FC; --hl:#FFE45C;
+  --t-idea:#2645D4; --t-task:#1C7F52; --t-question:#A86200; --t-reminder:#B8375F; --t-note:#5A6478;
+  --t-idea-bg:#E6EAFB; --t-task-bg:#E1F2EA; --t-question-bg:#FBEFDD; --t-reminder-bg:#F9E3EA; --t-note-bg:#ECEEF2;
+  --f-display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --f-body:"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --shadow:0 1px 0 rgba(22,29,43,.04), 0 10px 30px -12px rgba(22,29,43,.18);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#0F131B; --surface:#171D28; --ink:#E6EAF2; --muted:#9AA4B6; --line:#2A3242; --dot:#232A38;
+  --pen:#8399FF; --pen-soft:#1F2850; --hl:#8C7700;
+  --t-idea:#93A6FF; --t-task:#5FCB97; --t-question:#F0B05A; --t-reminder:#F2849F; --t-note:#A4ADBE;
+  --t-idea-bg:#1E2648; --t-task-bg:#14302A; --t-question-bg:#33270F; --t-reminder-bg:#3A1C27; --t-note-bg:#232A36;
+  --shadow:0 1px 0 rgba(0,0,0,.3), 0 12px 32px -14px rgba(0,0,0,.6); color-scheme:dark }}
+:root[data-theme="dark"]{
+  --paper:#0F131B; --surface:#171D28; --ink:#E6EAF2; --muted:#9AA4B6; --line:#2A3242; --dot:#232A38;
+  --pen:#8399FF; --pen-soft:#1F2850; --hl:#8C7700;
+  --t-idea:#93A6FF; --t-task:#5FCB97; --t-question:#F0B05A; --t-reminder:#F2849F; --t-note:#A4ADBE;
+  --t-idea-bg:#1E2648; --t-task-bg:#14302A; --t-question-bg:#33270F; --t-reminder-bg:#3A1C27; --t-note-bg:#232A36;
+  --shadow:0 1px 0 rgba(0,0,0,.3), 0 12px 32px -14px rgba(0,0,0,.6); color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--paper); background-image:radial-gradient(var(--dot) 1px, transparent 1.2px); background-size:22px 22px;
+  color:var(--ink); font-family:var(--f-body); font-size:16px; line-height:1.5;
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); padding-block:20px 48px}
+.wrap{max-width:1180px; margin:0 auto; display:flex; flex-direction:column; gap:22px}
+button,input,textarea{font:inherit; color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--pen); outline-offset:2px}
+
+/* header */
+header{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:12px}
+.brand h1{font-family:var(--f-display); font-weight:800; font-size:clamp(30px,5vw,44px); line-height:1; margin:0; letter-spacing:-.02em}
+.brand h1 .mark{background:linear-gradient(transparent 58%, var(--hl) 58%, var(--hl) 92%, transparent 92%); padding:0 .08em}
+.brand p{margin:6px 0 0; color:var(--muted)}
+.stats{font-family:var(--f-mono); font-size:12.5px; color:var(--muted); display:flex; gap:14px; font-variant-numeric:tabular-nums}
+.stats b{color:var(--ink); font-weight:600}
+
+/* dump box */
+.dump{background:var(--surface); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); padding:18px; display:flex; flex-direction:column; gap:12px}
+.dump label{font-family:var(--f-display); font-weight:600; font-size:20px}
+.dump textarea{width:100%; min-height:150px; resize:vertical; border:none; background:transparent; font-size:18px; line-height:1.6;
+  background-image:repeating-linear-gradient(transparent 0, transparent calc(1.6em - 1px), var(--line) calc(1.6em - 1px), var(--line) 1.6em);
+  background-attachment:local; padding:0 2px; outline:none}
+.dump textarea::placeholder{color:var(--muted)}
+.dump-row{display:flex; flex-wrap:wrap; align-items:center; gap:10px; justify-content:space-between}
+.hint{font-size:13.5px; color:var(--muted); max-width:60ch}
+.btns{display:flex; gap:8px; flex-wrap:wrap}
+.btn{border:1px solid var(--line); background:var(--surface); border-radius:999px; padding:9px 16px; font-weight:700; font-size:14.5px}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--pen); border-color:var(--pen); color:var(--surface); padding:10px 22px}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.55; cursor:progress}
+.status{font-family:var(--f-mono); font-size:13px; color:var(--pen); min-height:1.2em}
+.status.err{color:var(--t-reminder)}
+
+/* banners */
+.banner{display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; border:1px dashed var(--line); border-radius:12px; padding:10px 14px; font-size:14px; color:var(--muted); background:var(--surface)}
+.linkbtn{background:none; border:none; color:var(--pen); font-weight:700; padding:0; text-decoration:underline; text-underline-offset:3px}
+
+/* main grid */
+.grid{display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:22px; align-items:start}
+@media (max-width:880px){.grid{grid-template-columns:minmax(0,1fr)}}
+.brain{display:flex; flex-direction:column; gap:16px; min-width:0}
+.toolbar{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+.toolbar h2{font-family:var(--f-display); font-weight:800; font-size:24px; margin:0 8px 0 0}
+.chip{border:1px solid var(--line); background:var(--surface); border-radius:999px; padding:5px 12px; font-size:13.5px}
+.chip[aria-pressed="true"]{background:var(--ink); color:var(--surface); border-color:var(--ink)}
+.chip .n{font-family:var(--f-mono); font-size:11.5px; opacity:.7; margin-left:4px}
+.search{flex:1 1 180px; min-width:0; border:1px solid var(--line); background:var(--surface); border-radius:999px; padding:6px 14px; font-size:14px}
+
+.cat{display:flex; flex-direction:column; gap:10px}
+.cat h3{font-family:var(--f-display); font-weight:600; font-size:17px; margin:0; display:flex; align-items:baseline; gap:8px}
+.cat h3 .n{font-family:var(--f-mono); font-size:12px; color:var(--muted); font-weight:400}
+.cards{display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:12px}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px; display:flex; flex-direction:column; gap:8px; position:relative; min-width:0}
+.card.new{animation:hl 2.6s ease-out}
+.card.flash{animation:hl 1.4s ease-out}
+@keyframes hl{0%,35%{background:var(--hl); border-color:var(--hl)}100%{background:var(--surface)}}
+.card .top{display:flex; align-items:center; justify-content:space-between; gap:8px}
+.pill{font-family:var(--f-mono); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; padding:2px 8px; border-radius:6px}
+.p-idea{color:var(--t-idea); background:var(--t-idea-bg)} .p-task{color:var(--t-task); background:var(--t-task-bg)}
+.p-question{color:var(--t-question); background:var(--t-question-bg)} .p-reminder{color:var(--t-reminder); background:var(--t-reminder-bg)}
+.p-note{color:var(--t-note); background:var(--t-note-bg)}
+.card h4{margin:0; font-size:16.5px; line-height:1.3; font-weight:700; text-wrap:balance}
+.card p{margin:0; font-size:14.5px; color:var(--muted); overflow-wrap:anywhere}
+.tags{display:flex; flex-wrap:wrap; gap:6px}
+.tag{font-family:var(--f-mono); font-size:11.5px; color:var(--muted)}
+.links{display:flex; flex-direction:column; gap:4px; border-top:1px solid var(--line); padding-top:8px; font-size:13px}
+.links button{background:none; border:none; padding:0; text-align:left; color:var(--pen); font-weight:700}
+.links span{color:var(--muted)}
+.when{font-family:var(--f-mono); font-size:11px; color:var(--muted)}
+.del{background:none; border:none; color:var(--muted); font-size:18px; line-height:1; padding:0 2px; opacity:.5}
+.del:hover{opacity:1; color:var(--t-reminder)}
+.empty{background:var(--surface); border:1px dashed var(--line); border-radius:12px; padding:22px; color:var(--muted); text-align:center}
+
+/* rail */
+aside{display:flex; flex-direction:column; gap:16px; min-width:0}
+.panel{background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:10px}
+.panel h2{font-family:var(--f-display); font-weight:800; font-size:19px; margin:0}
+.panel .sub{font-size:13.5px; color:var(--muted); margin:-4px 0 0}
+.ask{display:flex; gap:8px}
+.ask input{flex:1; min-width:0; border:1px solid var(--line); background:var(--paper); border-radius:10px; padding:8px 12px; font-size:14.5px}
+.answer{font-size:14.5px; white-space:pre-wrap; overflow-wrap:anywhere; background:var(--pen-soft); border-radius:10px; padding:12px}
+.suggest{display:flex; flex-wrap:wrap; gap:6px}
+.suggest button{font-size:12.5px; border:1px solid var(--line); background:transparent; border-radius:999px; padding:3px 10px; color:var(--muted)}
+.todos{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px}
+.todos li{display:flex; gap:10px; align-items:flex-start; font-size:14.5px}
+.todos input{margin-top:3px; accent-color:var(--t-task); width:17px; height:17px; flex:none}
+.todos li.done span{text-decoration:line-through; color:var(--muted)}
+.todos .c{display:block; font-family:var(--f-mono); font-size:11px; color:var(--muted)}
+.dumps{display:flex; flex-direction:column; gap:8px; max-height:260px; overflow:auto}
+.dumps div{font-size:13px; color:var(--muted); border-left:2px solid var(--line); padding-left:10px; overflow-wrap:anywhere}
+.dumps .when{display:block}
+@media (prefers-reduced-motion: reduce){.card.new,.card.flash{animation:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>Thought <span class="mark">Dump</span></h1>
+      <p>Dump it all here. The AI sorts it into your second brain.</p>
+    </div>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <section class="dump" aria-labelledby="dump-label">
+    <label id="dump-label" for="dump-text">What's on your mind?</label>
+    <textarea id="dump-text" placeholder="Just type everything. Ideas, to-dos, random thoughts, all mixed together. Don't organize it, that's our job."></textarea>
+    <div class="dump-row">
+      <div class="hint">On your phone, tap the mic on your keyboard to talk instead of typing. Press ⌘/Ctrl + Enter to dump.</div>
+      <div class="btns">
+        <button class="btn" id="sample-btn" type="button">Try a messy example</button>
+        <button class="btn primary" id="dump-btn" type="button">Dump it</button>
+      </div>
+    </div>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+  </section>
+
+  <div class="banner" id="example-banner" hidden>
+    <span>You're looking at an example brain so you can see how it works.</span>
+    <button class="linkbtn" id="clear-btn" type="button">Clear examples and start fresh</button>
+  </div>
+
+  <div class="grid">
+    <section class="brain" aria-label="Your second brain">
+      <div class="toolbar" id="toolbar">
+        <h2>Your brain</h2>
+      </div>
+      <div id="cats"></div>
+    </section>
+
+    <aside>
+      <div class="panel">
+        <h2>Ask your brain</h2>
+        <p class="sub">Answers come only from what you've dumped.</p>
+        <form class="ask" id="ask-form">
+          <input id="ask-input" placeholder="What were my business ideas?" autocomplete="off">
+          <button class="btn primary" type="submit" id="ask-btn">Ask</button>
+        </form>
+        <div class="suggest" id="suggest"></div>
+        <div class="answer" id="answer" hidden></div>
+      </div>
+
+      <div class="panel">
+        <h2>To-dos it found</h2>
+        <ul class="todos" id="todos"></ul>
+      </div>
+
+      <div class="panel">
+        <h2>Raw dumps</h2>
+        <p class="sub">Everything you dumped, word for word.</p>
+        <div class="dumps" id="dumps"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function(){
+  const KEY = "thoughtdump.v1";
+  const TYPES = ["idea","task","question","reminder","note"];
+  const $ = (id) => document.getElementById(id);
+  const DAY = 86400000;
+  let sample = null;
+  let filter = "All";
+  let query = "";
+  let newIds = new Set();
+  let busy = false;
+
+  const SAMPLE_RAMBLE = "ok so walking to class and I had this thought, what if there was an app that tells you which dining hall has the shortest line right now, people would use that every day. also I need to email professor Lee about the group project deadline before friday. and buy a birthday gift for my sister, maybe concert tickets? random but I wonder if students would actually pay for the laundry pickup thing or if it should be free with ads. oh and remind me to start running 3 times a week again";
+
+  function seed(){
+    const now = Date.now();
+    const ideas = [
+      {id:"ex1", title:"Dorm laundry pickup service", summary:"Students hand off a bag, it comes back washed and folded the next day. Start with one dorm to test it.", category:"Business Ideas", type:"idea", tags:["startup","campus"], links:[], createdAt:now-6*DAY},
+      {id:"ex2", title:"Local coffee bean subscription", summary:"Monthly box of beans from small Boston roasters, sold to students and young workers.", category:"Business Ideas", type:"idea", tags:["subscription"], links:[], createdAt:now-4*DAY},
+      {id:"ex3", title:"Set up study group for stats midterm", summary:"Get 3 or 4 people together the week before the midterm.", category:"School", type:"task", tags:["midterm"], links:[], createdAt:now-3*DAY, done:false},
+      {id:"ex4", title:"Learn basic SQL this month", summary:"Would help with the internship and with tracking numbers for any business idea.", category:"Learning", type:"note", tags:["skills","data"], links:[], createdAt:now-3*DAY},
+      {id:"ex5", title:"Call grandma on Sunday", summary:"Haven't called in two weeks.", category:"Personal", type:"reminder", tags:["family"], links:[], createdAt:now-2*DAY, done:false},
+      {id:"ex6", title:"Would students pay for laundry pickup?", summary:"Need to ask around before building anything. Maybe a quick survey in the dorm group chat.", category:"Business Ideas", type:"question", tags:["validation"], links:[{id:"ex1", why:"Tests demand for the laundry idea"}], createdAt:now-1*DAY},
+      {id:"ex7", title:"Post the laundry survey in the group chat", summary:"Five questions max. Ask about price and how often they'd use it.", category:"Business Ideas", type:"task", tags:["validation"], links:[{id:"ex6", why:"This is how you answer that question"}], createdAt:now-1*DAY, done:false}
+    ];
+    return {ideas, dumps:[
+      {id:"d1", text:"laundry pickup for dorms?? people hate doing laundry. also need to learn SQL at some point", createdAt:now-6*DAY, example:true},
+      {id:"d2", text:"call grandma sunday. stats midterm coming up, should get a study group going", createdAt:now-3*DAY, example:true}
+    ], example:true};
+  }
+
+  function load(){
+    try{ const raw = localStorage.getItem(KEY); if(raw){ const s = JSON.parse(raw); if(s && Array.isArray(s.ideas)) return s; } }catch(e){}
+    return null;
+  }
+  let state = load() || seed();
+  function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+
+  const uid = () => Math.random().toString(36).slice(2,9);
+  function ago(t){
+    const d = Date.now()-t;
+    if(d < 60000) return "just now";
+    if(d < 3600000) return Math.floor(d/60000)+" min ago";
+    if(d < DAY) return Math.floor(d/3600000)+" hr ago";
+    const n = Math.floor(d/DAY); return n === 1 ? "yesterday" : n+" days ago";
+  }
+  function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; }
+  function cleanType(t){ t = String(t||"").toLowerCase(); return TYPES.includes(t) ? t : "note"; }
+  function byId(id){ return state.ideas.find(i => i.id === id); }
+
+  // ---------- render ----------
+  function render(){
+    const ideas = state.ideas;
+    const cats = {};
+    ideas.forEach(i => { (cats[i.category] = cats[i.category] || []).push(i); });
+    const catNames = Object.keys(cats).sort((a,b) => cats[b].length - cats[a].length || a.localeCompare(b));
+    if(filter !== "All" && !cats[filter]) filter = "All";
+
+    $("stats").innerHTML = "";
+    [["thoughts", ideas.length],["categories", catNames.length],["connections", ideas.reduce((n,i)=>n+(i.links||[]).length,0)]].forEach(([k,v]) => {
+      const s = el("span"); const b = el("b", null, String(v)); s.append(b, " "+k); $("stats").append(s);
+    });
+    $("example-banner").hidden = !state.example;
+
+    // toolbar
+    const tb = $("toolbar"); tb.querySelectorAll(".chip,.search").forEach(n => n.remove());
+    ["All", ...catNames].forEach(name => {
+      const c = el("button","chip", name); c.type = "button";
+      c.setAttribute("aria-pressed", String(filter === name));
+      const n = el("span","n", String(name === "All" ? ideas.length : cats[name].length)); c.append(n);
+      c.onclick = () => { filter = name; render(); };
+      tb.append(c);
+    });
+    const s = el("input","search"); s.id = "search"; s.type = "search"; s.placeholder = "Search your thoughts"; s.value = query;
+    s.oninput = () => { query = s.value; renderCats(cats, catNames); };
+    tb.append(s);
+
+    renderCats(cats, catNames);
+    renderTodos();
+    renderDumps();
+    renderSuggest(catNames);
+  }
+
+  function matches(i){
+    if(!query.trim()) return true;
+    const q = query.toLowerCase();
+    return [i.title, i.summary, i.category, (i.tags||[]).join(" ")].join(" ").toLowerCase().includes(q);
+  }
+
+  function renderCats(cats, catNames){
+    const root = $("cats"); root.innerHTML = "";
+    const names = filter === "All" ? catNames : [filter];
+    let shown = 0;
+    names.forEach(name => {
+      const list = (cats[name] || []).filter(matches).sort((a,b) => b.createdAt - a.createdAt);
+      if(!list.length) return;
+      shown += list.length;
+      const sec = el("div","cat");
+      const h = el("h3", null, name); h.append(el("span","n", list.length + (list.length === 1 ? " thought" : " thoughts")));
+      const grid = el("div","cards");
+      list.forEach(i => grid.append(card(i)));
+      sec.append(h, grid); root.append(sec);
+    });
+    if(!shown){
+      root.append(el("div","empty", state.ideas.length ? "Nothing matches that search." : "Your brain is empty. Dump your first thoughts above and they'll show up here, sorted."));
+    }
+    root.style.display = "flex"; root.style.flexDirection = "column"; root.style.gap = "22px";
+  }
+
+  function card(i){
+    const c = el("article","card"); c.id = "idea-"+i.id;
+    if(newIds.has(i.id)) c.classList.add("new");
+    const top = el("div","top");
+    top.append(el("span","pill p-"+i.type, i.type));
+    const right = el("div"); right.style.display = "flex"; right.style.gap = "8px"; right.style.alignItems = "center";
+    right.append(el("span","when", ago(i.createdAt)));
+    const del = el("button","del","×"); del.type = "button"; del.title = "Delete this thought"; del.setAttribute("aria-label","Delete "+i.title);
+    del.onclick = () => { state.ideas = state.ideas.filter(x => x.id !== i.id); state.ideas.forEach(x => x.links = (x.links||[]).filter(l => l.id !== i.id)); save(); render(); };
+    right.append(del); top.append(right);
+    c.append(top, el("h4", null, i.title));
+    if(i.summary) c.append(el("p", null, i.summary));
+    if(i.tags && i.tags.length){ const t = el("div","tags"); i.tags.forEach(x => t.append(el("span","tag","#"+x))); c.append(t); }
+    const links = (i.links||[]).filter(l => byId(l.id));
+    const backs = state.ideas.filter(x => x.id !== i.id && (x.links||[]).some(l => l.id === i.id) && !links.some(l => l.id === x.id));
+    if(links.length || backs.length){
+      const box = el("div","links");
+      links.forEach(l => box.append(linkRow(byId(l.id), l.why)));
+      backs.forEach(x => box.append(linkRow(x, "Mentioned in a later thought")));
+      c.append(box);
+    }
+    return c;
+  }
+  function linkRow(target, why){
+    const row = el("div");
+    const b = el("button", null, "↔ " + target.title); b.type = "button";
+    b.onclick = () => jumpTo(target.id);
+    row.append(b); if(why){ row.append(document.createElement("br"), el("span", null, why)); }
+    return row;
+  }
+  function jumpTo(id){
+    filter = "All"; query = ""; newIds = new Set(); render();
+    const n = $("idea-"+id); if(!n) return;
+    n.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block:"center"});
+    n.classList.remove("flash"); void n.offsetWidth; n.classList.add("flash");
+  }
+
+  function renderTodos(){
+    const ul = $("todos"); ul.innerHTML = "";
+    const list = state.ideas.filter(i => i.type === "task" || i.type === "reminder").sort((a,b) => (a.done?1:0)-(b.done?1:0) || b.createdAt-a.createdAt);
+    if(!list.length){ ul.append(el("li", null, "No to-dos yet. When you mention something you need to do, it lands here.")); return; }
+    list.forEach(i => {
+      const li = el("li", i.done ? "done" : null);
+      const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!i.done; cb.id = "todo-"+i.id;
+      cb.onchange = () => { i.done = cb.checked; save(); renderTodos(); };
+      const lab = el("label"); lab.htmlFor = cb.id;
+      const sp = el("span", null, i.title); lab.append(sp, el("span","c", i.category));
+      li.append(cb, lab); ul.append(li);
+    });
+  }
+
+  function renderDumps(){
+    const box = $("dumps"); box.innerHTML = "";
+    const list = [...state.dumps].sort((a,b) => b.createdAt - a.createdAt);
+    if(!list.length){ box.append(el("div", null, "Nothing yet.")); return; }
+    list.forEach(d => { const x = el("div"); x.append(el("span","when", ago(d.createdAt)), d.text); box.append(x); });
+  }
+
+  function renderSuggest(catNames){
+    const box = $("suggest"); box.innerHTML = "";
+    const qs = ["What should I do first this week?", "Which ideas connect to each other?"];
+    if(catNames[0]) qs.unshift("Summarize my " + catNames[0].toLowerCase());
+    qs.forEach(q => { const b = el("button", null, q); b.type = "button"; b.onclick = () => { $("ask-input").value = q; ask(); }; box.append(b); });
+  }
+
+  // ---------- status ----------
+  function setStatus(msg, err){ const s = $("status"); s.textContent = msg || ""; s.classList.toggle("err", !!err); }
+  function errCopy(code){
+    switch(code){
+      case "not_granted": return "AI sorting needs your OK. Allow it when Claude asks, or reload the page to be asked again.";
+      case "rate_limited": return "Too many requests right now. Wait a minute and try again.";
+      case "session_expired": return "You've been signed out of Claude. Sign in again and retry.";
+      case "invalid_json": return "The AI's answer came back garbled. Press Dump it again.";
+      case "refused": return "The AI wouldn't process that text. Try rewording it.";
+      case "prompt_too_large": return "That's a lot at once. Try dumping it in smaller pieces.";
+      default: return "Something went wrong reaching the AI. Press Dump it again.";
+    }
+  }
+
+  // ---------- dump ----------
+  function brainIndex(){
+    return state.ideas.slice(-120).map(i => `${i.id} | ${i.category} | ${i.type} | ${i.title}`).join("\n") || "(empty)";
+  }
+  function buildPrompt(text){
+    const cats = [...new Set(state.ideas.map(i => i.category))];
+    return `You organize a person's "thought dump" into their second brain.
+
+The person typed or dictated this messy dump:
+"""
+${text}
+"""
+
+Their existing categories: ${cats.length ? cats.join(", ") : "(none yet)"}
+Their existing thoughts (id | category | type | title):
+${brainIndex()}
+
+Do this:
+1. Split the dump into separate thoughts. One thought = one idea, task, question, reminder, or note. Drop filler words.
+2. For each thought give:
+   - "title": short, max 8 words, clear on its own
+   - "summary": 1-2 plain sentences in the person's voice, cleaned up. Keep their meaning; don't add facts.
+   - "category": reuse an existing category if it fits; otherwise make a new one, 1-3 words, Title Case (e.g. "Business Ideas", "School", "Personal").
+   - "type": one of idea, task, question, reminder, note. Use "task" for things they need to do.
+   - "tags": up to 3 short lowercase tags
+   - "links": existing thought ids that this genuinely connects to, each with "why" (max 10 words). Use [] if none. Only use ids from the list above.
+
+Reply with only JSON in this shape:
+{"thoughts":[{"title":"","summary":"","category":"","type":"task","tags":[""],"links":[{"id":"","why":""}]}]}`;
+  }
+
+  function localSort(text){
+    const parts = text.split(/\n+|(?<=[.!?])\s+|\s+(?:also|and also|oh and|plus)\s+/i).map(s => s.trim()).filter(s => s.length > 3);
+    return parts.map(p => {
+      const low = p.toLowerCase();
+      let type = "note";
+      if(/^(need to|have to|gotta|must|email|call|buy|book|send|finish|start|i need to|remind me)/.test(low) || /\b(need to|have to|remind me)\b/.test(low)) type = "task";
+      else if(/\?$/.test(p) || /\b(i wonder|what if|should i|would)\b/.test(low)) type = /what if|app|business|startup/.test(low) ? "idea" : "question";
+      else if(/\b(idea|app|business|startup)\b/.test(low)) type = "idea";
+      const title = p.replace(/^(ok so|so|and|oh|also|random but)\s+/i,"").split(/\s+/).slice(0,8).join(" ").replace(/[,.]$/,"");
+      return {title: title.charAt(0).toUpperCase()+title.slice(1), summary:p, category:"Unsorted", type, tags:[], links:[]};
+    });
+  }
+
+  async function dump(){
+    const box = $("dump-text");
+    const text = box.value.trim();
+    if(!text || busy) return;
+    busy = true; $("dump-btn").disabled = true; $("sample-btn").disabled = true;
+    setStatus(sample ? "Reading your thoughts and sorting them…" : "Sorting…");
+    let thoughts = null, usedAI = false;
+    try{
+      if(sample){
+        const res = await sample.json(buildPrompt(text), {modelTier:"quick", cache:false});
+        const arr = Array.isArray(res) ? res : (res && Array.isArray(res.thoughts) ? res.thoughts : null);
+        if(!arr || !arr.length) throw {code:"invalid_json"};
+        thoughts = arr; usedAI = true;
+      } else {
+        thoughts = localSort(text);
+      }
+    }catch(e){
+      busy = false; $("dump-btn").disabled = false; $("sample-btn").disabled = false;
+      if(e && e.code === "cancelled"){ setStatus(""); return; }
+      if(e && (e.code === "not_granted" || e.code === "sampling_disabled" || e.code === "not_declared")){
+        setStatus(errCopy(e.code), true); return;
+      }
+      setStatus(errCopy(e && e.code), true); return;
+    }
+    const known = new Set(state.ideas.map(i => i.id));
+    const now = Date.now();
+    newIds = new Set();
+    const dumpId = uid();
+    thoughts.forEach(t => {
+      if(!t || !t.title) return;
+      const id = uid();
+      const links = (Array.isArray(t.links) ? t.links : []).filter(l => l && known.has(String(l.id))).map(l => ({id:String(l.id), why:String(l.why||"").slice(0,80)}));
+      state.ideas.push({
+        id, title:String(t.title).slice(0,90), summary:String(t.summary||"").slice(0,300),
+        category:(String(t.category||"Unsorted").trim().slice(0,30)) || "Unsorted",
+        type:cleanType(t.type), tags:(Array.isArray(t.tags)?t.tags:[]).slice(0,3).map(x => String(x).toLowerCase().replace(/^#/,"").slice(0,20)).filter(Boolean),
+        links, createdAt:now, dumpId, done:false
+      });
+      newIds.add(id);
+    });
+    state.dumps.push({id:dumpId, text, createdAt:now});
+    save();
+    box.value = "";
+    filter = "All"; query = "";
+    render();
+    const n = newIds.size;
+    setStatus(usedAI ? `Done. Split into ${n} thought${n===1?"":"s"} and sorted them below.` : `Saved ${n} thought${n===1?"":"s"} with simple sorting. Open this page in Claude to turn on AI sorting.`);
+    busy = false; $("dump-btn").disabled = false; $("sample-btn").disabled = false;
+    const first = document.querySelector(".card.new");
+    if(first) first.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block:"center"});
+  }
+
+  // ---------- ask ----------
+  let askCtl = null;
+  async function ask(){
+    const q = $("ask-input").value.trim();
+    if(!q) return;
+    const out = $("answer"); out.hidden = false;
+    if(!sample){ out.textContent = "Asking your brain needs this page opened inside Claude."; return; }
+    if(askCtl) askCtl.abort();
+    askCtl = new AbortController();
+    $("ask-btn").disabled = true;
+    out.textContent = "Thinking…";
+    const notes = state.ideas.slice(-150).map(i => `- [${i.title}] (${i.category}, ${i.type}${i.done?", done":""}): ${i.summary}`).join("\n");
+    const prompt = `You are the person's second brain. Answer their question using ONLY their notes below. Write simply and briefly (under 120 words), speaking to them as "you". When you use a note, mention its title in [square brackets]. If the notes don't cover it, say so plainly.
+
+Their notes:
+${notes || "(no notes yet)"}
+
+Their question: ${q}`;
+    try{
+      await sample(prompt, {modelTier:"quick", cache:false, signal:askCtl.signal, onText:({text}) => { out.textContent = text; }});
+    }catch(e){
+      if(e && e.code === "cancelled") return;
+      out.textContent = (e && e.text ? e.text + "\n\n" : "") + errCopy(e && e.code);
+    }finally{
+      $("ask-btn").disabled = false;
+    }
+  }
+
+  // ---------- wire up ----------
+  $("dump-btn").onclick = dump;
+  $("dump-text").addEventListener("keydown", e => { if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){ e.preventDefault(); dump(); } });
+  $("sample-btn").onclick = () => { $("dump-text").value = SAMPLE_RAMBLE; $("dump-text").focus(); setStatus("Example loaded. Press Dump it to watch it get sorted."); };
+  $("ask-form").addEventListener("submit", e => { e.preventDefault(); ask(); });
+  $("clear-btn").onclick = () => {
+    state.ideas = state.ideas.filter(i => !String(i.id).startsWith("ex"));
+    state.ideas.forEach(i => i.links = (i.links||[]).filter(l => !String(l.id).startsWith("ex")));
+    state.dumps = state.dumps.filter(d => !d.example);
+    state.example = false; save(); render(); setStatus("Examples cleared. Your brain is all yours now.");
+  };
+
+  render();
+  if(window.claude && typeof window.claude.use === "function"){
+    window.claude.use("sample").then(fn => { sample = fn || null; }).catch(() => { sample = null; });
+  }
+})();
+</script>

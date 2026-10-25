@@ -1,0 +1,161 @@
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light !important;
+  --paper: #F2F4F8;
+  --surface: #FFFFFF;
+  --ink: #161D2B;
+  --muted: #596377;
+  --line: #D7DCE6;
+  --dot: #C9D0DC;
+  --pen: #2645D4;
+  --pen-soft: #E3E8FC;
+  --hl: #FFE45C;
+  --t-idea: #2645D4;
+  --t-idea-bg: #E6EAFB;
+  --t-task: #1C7F52;
+  --t-task-bg: #E1F2EA;
+  --t-question: #A86200;
+  --t-question-bg: #FBEFDD;
+  --t-reminder: #B8375F;
+  --t-reminder-bg: #F9E3EA;
+  --t-note: #5A6478;
+  --t-note-bg: #ECEEF2;
+  --shadow: 0 1px 0 rgba(22, 29, 43, 0.04), 0 10px 30px -12px rgba(22, 29, 43, 0.18);
+  --f-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+html, body {
+  color-scheme: light !important;
+}
+
+/* Ensure no dark-mode overrides ever apply */
+.dark, [data-theme="dark"] {
+  color-scheme: light !important;
+  background-color: var(--paper) !important;
+  color: var(--ink) !important;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--paper);
+  background-image: radial-gradient(var(--dot) 1px, transparent 1.2px);
+  background-size: 22px 22px;
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button, input, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--pen);
+  outline-offset: 2px;
+}
+
+/* Highlighter mark */
+.mark {
+  background: linear-gradient(transparent 58%, var(--hl) 58%, var(--hl) 92%, transparent 92%);
+  padding: 0 0.08em;
+}
+
+/* Notebook lined textarea background */
+.lined-textarea {
+  background-image: repeating-linear-gradient(
+    transparent 0,
+    transparent calc(1.6em - 1px),
+    var(--line) calc(1.6em - 1px),
+    var(--line) 1.6em
+  );
+  background-attachment: local;
+  line-height: 1.6;
+}
+
+/* Type pills */
+.pill {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 6px;
+  display: inline-block;
+}
+.p-idea {
+  color: var(--t-idea);
+  background: var(--t-idea-bg);
+}
+.p-task {
+  color: var(--t-task);
+  background: var(--t-task-bg);
+}
+.p-question {
+  color: var(--t-question);
+  background: var(--t-question-bg);
+}
+.p-reminder {
+  color: var(--t-reminder);
+  background: var(--t-reminder-bg);
+}
+.p-note {
+  color: var(--t-note);
+  background: var(--t-note-bg);
+}
+
+/* Card animations */
+.card-new {
+  animation: hl-anim 2.6s ease-out;
+}
+.card-flash {
+  animation: hl-anim 1.4s ease-out;
+}
+@keyframes hl-anim {
+  0%, 35% {
+    background-color: var(--hl);
+    border-color: var(--hl);
+  }
+  100% {
+    background-color: var(--surface);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-new, .card-flash {
+    animation: none;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(22, 29, 43, 0.15);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(22, 29, 43, 0.3);
+}
