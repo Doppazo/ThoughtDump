@@ -335,19 +335,19 @@ export default function HomePage() {
             </div>
 
             {/* Large Center Microphone Button (Prominent Voice Dial) */}
-            <div className="py-2">
+            <div className="py-2 flex flex-col items-center">
               <button
                 type="button"
                 onClick={handleToggleVoice}
                 disabled={isProcessing}
-                className={`relative w-36 h-36 sm:w-44 sm:h-44 rounded-full border-4 transition-all duration-300 flex flex-col items-center justify-center shadow-lg group mx-auto ${
+                className={`relative w-40 h-40 sm:w-48 sm:h-48 rounded-full border-4 transition-all duration-300 flex items-center justify-center shadow-lg group mx-auto ${
                   isRecording
                     ? "border-[var(--t-reminder)] bg-[var(--t-reminder-bg)] shadow-[var(--t-reminder)]/30 scale-105"
                     : "border-[var(--line)] bg-[var(--surface)] hover:border-[var(--pen)] hover:scale-102 hover:shadow-xl"
                 }`}
                 title={isRecording ? "Stop recording voice dump" : "Press to speak thought"}
               >
-                {/* Circular inner element */}
+                {/* Circular inner element (dead-center concentric circle) */}
                 <div
                   className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center transition-all ${
                     isRecording
@@ -362,8 +362,9 @@ export default function HomePage() {
                   )}
                 </div>
 
+                {/* Status text (centered at the bottom inside the dial) */}
                 <span
-                  className={`font-mono text-xs font-bold uppercase tracking-wider mt-2 transition-colors ${
+                  className={`absolute bottom-3 sm:bottom-4 left-0 right-0 text-center font-mono text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-colors pointer-events-none select-none ${
                     isRecording ? "text-[var(--t-reminder)]" : "text-[var(--muted)] group-hover:text-[var(--pen)]"
                   }`}
                 >
