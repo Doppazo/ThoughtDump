@@ -63,24 +63,16 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
 
     // 1. Add Category Hub nodes
     categories.forEach((cat) => {
-      const color = catColorMap.get(cat.name.toLowerCase()) || "#2645D4";
       const hubId = `hub_${cat.name}`;
-      const cached = nodePositionsRef.current.get(hubId);
       const hubNode: any = {
         id: hubId,
         name: cat.name,
-        color,
-        val: 16,
+        color: "#111827", // Solid Black
+        val: 20,
         isHub: true,
         categoryName: cat.name,
         neighbors: new Set<string>(),
         links: new Set<any>(),
-        ...(cached ? {
-          x: cached.x,
-          y: cached.y,
-          fx: isLocked ? (cached.fx ?? cached.x) : undefined,
-          fy: isLocked ? (cached.fy ?? cached.y) : undefined,
-        } : {}),
       };
       nList.push(hubNode);
       nMap.set(hubNode.id, hubNode);
@@ -88,23 +80,15 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
 
     // 2. Add Idea nodes
     ideas.forEach((idea) => {
-      const color = catColorMap.get(idea.category.toLowerCase()) || "#2645D4";
-      const cached = nodePositionsRef.current.get(idea.id);
       const ideaNode: any = {
         id: idea.id,
         name: idea.title,
-        color,
-        val: 6,
+        color: "#111827", // Solid Black
+        val: 8,
         isHub: false,
         ideaData: idea,
         neighbors: new Set<string>(),
         links: new Set<any>(),
-        ...(cached ? {
-          x: cached.x,
-          y: cached.y,
-          fx: isLocked ? (cached.fx ?? cached.x) : undefined,
-          fy: isLocked ? (cached.fy ?? cached.y) : undefined,
-        } : {}),
       };
       nList.push(ideaNode);
       nMap.set(ideaNode.id, ideaNode);
@@ -166,31 +150,42 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
     return { nodes: nList, links: lList, nodeMap: nMap };
   }, [ideas, categories, catColorMap, showCategoryLinks]);
 
-  // Configure forces to separate main nodes and provide spacious layout
+  // Configure forces to separate main nodes widely across the canvas
   useEffect(() => {
-    const applyForces = () => {
+    const applyForcesAndLayout = () => {
       if (fgRef.current) {
         const fg = fgRef.current;
         const charge = fg.d3Force("charge");
         if (charge) {
-          // Strong repulsion for main category hubs (-420) so they separate widely,
-          // and -140 for regular ideas
-          charge.strength((n: any) => (n.isHub ? -420 : -140));
-          charge.distanceMax(550);
+          // Extra strong repulsion for category hubs (-1200) so they spread across opposite sides of the canvas!
+          // and -400 for regular ideas
+          charge.strength((n: any) => (n.isHub ? -1200 : -400));
+          charge.distanceMax(1200);
         }
         const link = fg.d3Force("link");
         if (link) {
-          // Generous distance between category hubs and their idea children (120px)
-          // and 85px between linked ideas
-          link.distance((l: any) => (l.isCategoryLink ? 120 : 85));
+          // Generous wide separation: 220px between hub and thoughts, 140px between linked thoughts
+          link.distance((l: any) => (l.isCategoryLink ? 220 : 140));
         }
+
+        // Unpin any previous positions and reheat simulation so the new wide distances take effect
+        nodes.forEach((n) => {
+          n.fx = undefined;
+          n.fy = undefined;
+        });
+        fg.d3ReheatSimulation();
+
+        // After simulation expands, automatically zoom to fit so nodes fill the viewport!
+        setTimeout(() => {
+          fgRef.current?.zoomToFit(500, 70);
+        }, 500);
       }
     };
 
-    applyForces();
-    const timer = setTimeout(applyForces, 150);
+    applyForcesAndLayout();
+    const timer = setTimeout(applyForcesAndLayout, 200);
     return () => clearTimeout(timer);
-  }, []);
+  }, [ideas.length, categories.length]);
 
   // When engine stops, lock positions if isLocked is true so nodes never wander or drift
   const handleEngineStop = useCallback(() => {
@@ -310,13 +305,13 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
 
   const handleNodeClick = useCallback(
     (node: any) => {
-      // Zoom in a little and center smoothly on the touched/clicked node
+      // Zoom in pronouncedly and center smoothly on the touched/clicked node
       if (fgRef.current && node.x !== undefined && node.y !== undefined) {
-        fgRef.current.centerAt(node.x, node.y, 600);
+        fgRef.current.centerAt(node.x, node.y, 500);
         const currentZoom = fgRef.current.zoom();
-        // Zoom in by ~35% (between 1.8x and 3.2x)
-        const targetZoom = Math.min(Math.max(currentZoom * 1.35, 1.8), 3.2);
-        fgRef.current.zoom(targetZoom, 600);
+        // Zoom in to at least 2.6x (or 1.6x of current) so zoom is unmistakable
+        const targetZoom = Math.max(currentZoom * 1.6, 2.6);
+        fgRef.current.zoom(targetZoom, 500);
       }
 
       setHoverNode(node);
@@ -426,7 +421,7 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
           d3VelocityDecay={0.7}
           onEngineStop={handleEngineStop}
           onNodeDragEnd={handleNodeDragEnd}
-          nodeRelSize={4}
+          nodeRelSize={7}
           linkWidth={(link: any) =>
             highlightLinks.has(link) ? 3 : link.width || 1
           }
@@ -435,52 +430,71 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
             if (hoverNode && !highlightLinks.has(link)) return "#E5E7EB33";
             return link.color || "#D7DCE6";
           }}
+          nodePointerAreaPaint={(node: any, color, ctx) => {
+            // Generous hit-box area so clicking/touching always triggers onNodeClick
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, node.isHub ? 30 : 22, 0, 2 * Math.PI, false);
+            ctx.fill();
+          }}
           nodeCanvasObject={(node: any, ctx, globalScale) => {
             const isHovered = hoverNode === node;
             const isConnected = highlightNodes.has(node.id);
             const isDimmed = hoverNode && !isConnected;
 
-            const radius = node.isHub ? 8 : 4.5;
+            const isHub = node.isHub;
+            const radius = isHub ? 12 : 7;
             const label = node.name;
-            const fontSize = node.isHub ? 13 / globalScale : 11 / globalScale;
+            const fontSize = isHub ? 14 / globalScale : 11 / globalScale;
 
             ctx.beginPath();
             ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI, false);
 
-            ctx.fillStyle = isDimmed ? "#D1D5DB" : node.color || "#2645D4";
+            // Change node color to solid BLACK as requested
+            ctx.fillStyle = isDimmed ? "#9CA3AF" : "#111827";
             ctx.fill();
 
-            if (isHovered || node.isHub) {
-              ctx.strokeStyle = node.isHub ? "#161D2B" : "var(--pen)";
-              ctx.lineWidth = node.isHub ? 2 / globalScale : 1.5 / globalScale;
+            // Accent outline on hover or hubs
+            if (isHovered || isConnected) {
+              ctx.strokeStyle = "var(--pen)";
+              ctx.lineWidth = 3 / globalScale;
+              ctx.stroke();
+            } else if (isHub) {
+              ctx.strokeStyle = "#4B5563";
+              ctx.lineWidth = 2 / globalScale;
               ctx.stroke();
             }
 
-            // Draw label
-            if (node.isHub || isHovered || isConnected || globalScale >= 1.6) {
-              ctx.font = `${node.isHub ? "800" : "600"} ${fontSize}px sans-serif`;
+            // Draw crisp black label on soft pill
+            if (isHub || isHovered || isConnected || globalScale >= 1.1) {
+              ctx.font = `${isHub ? "800" : "600"} ${fontSize}px sans-serif`;
               ctx.textAlign = "center";
               ctx.textBaseline = "middle";
 
-              // Label background bubble
               const textWidth = ctx.measureText(label).width;
-              const bWidth = textWidth + 8 / globalScale;
-              const bHeight = fontSize + 4 / globalScale;
-              ctx.fillStyle = isDimmed ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.92)";
+              const bWidth = textWidth + 10 / globalScale;
+              const bHeight = fontSize + 6 / globalScale;
+              const labelY = node.y + (isHub ? 18 : 13) / globalScale;
+
+              ctx.fillStyle = isDimmed ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.95)";
               ctx.fillRect(
                 node.x - bWidth / 2,
-                node.y + (node.isHub ? 12 : 8) / globalScale - bHeight / 2,
+                labelY - bHeight / 2,
                 bWidth,
                 bHeight
               );
 
-              ctx.fillStyle = isDimmed ? "#9CA3AF" : node.isHub ? "var(--ink)" : "var(--pen)";
-              ctx.fillText(label, node.x, node.y + (node.isHub ? 12 : 8) / globalScale);
+              ctx.fillStyle = isDimmed ? "#9CA3AF" : "#111827"; // Crisp black text
+              ctx.fillText(label, node.x, labelY);
             }
           }}
           onNodeHover={(node: any) => setHoverNode(node || null)}
           onLinkHover={(link: any) => setHoverLink(link || null)}
           onNodeClick={handleNodeClick}
+          onBackgroundClick={() => {
+            setHoverNode(null);
+            fgRef.current?.zoomToFit(500, 70);
+          }}
         />
       </div>
 

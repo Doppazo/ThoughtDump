@@ -158,23 +158,29 @@ export function LocalGraph({
         d3AlphaDecay={0.09}
         d3VelocityDecay={0.75}
         onEngineStop={handleEngineStop}
-        nodeRelSize={4}
+        nodeRelSize={6}
         linkColor={(link: any) => link.color || "#D7DCE6"}
         linkWidth={(link: any) => (link.label ? 2 : 1)}
+        nodePointerAreaPaint={(node: any, color, ctx) => {
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, 16, 0, 2 * Math.PI, false);
+          ctx.fill();
+        }}
         nodeCanvasObject={(node: any, ctx, globalScale) => {
           const label = node.name;
           const fontSize = node.isHub ? 11 / globalScale : 9 / globalScale;
           ctx.font = `${node.isCurrent || node.isHub ? "bold" : "normal"} ${fontSize}px sans-serif`;
 
-          // Circle
+          // Circle: Solid black node
           ctx.beginPath();
-          ctx.arc(node.x, node.y, node.isHub ? 6 : node.isCurrent ? 5 : 3.5, 0, 2 * Math.PI, false);
-          ctx.fillStyle = node.color || "#2645D4";
+          ctx.arc(node.x, node.y, node.isHub ? 7 : node.isCurrent ? 6 : 4.5, 0, 2 * Math.PI, false);
+          ctx.fillStyle = "#111827";
           ctx.fill();
 
           if (node.isCurrent) {
-            ctx.strokeStyle = "#161D2B";
-            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = "var(--pen)";
+            ctx.lineWidth = 2;
             ctx.stroke();
           }
 
