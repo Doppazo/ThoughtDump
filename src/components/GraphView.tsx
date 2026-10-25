@@ -5,11 +5,14 @@ import dynamic from "next/dynamic";
 import { useIdeas } from "@/context/IdeasContext";
 import { Idea, Category } from "@/types";
 import { getCategoryColor } from "@/lib/colors";
+import { forceCollide } from "d3-force-3d";
 import {
   Search,
   Eye,
   EyeOff,
   Maximize2,
+  ZoomIn,
+  ZoomOut,
   X,
   ExternalLink,
   Layers,
@@ -40,7 +43,7 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
   const nodePositionsRef = useRef<Map<string, { x: number; y: number; fx?: number; fy?: number }>>(new Map());
 
   const [showCategoryLinks, setShowCategoryLinks] = useState(true);
-  const [isLocked, setIsLocked] = useState(true);
+  const [isLocked, setIsLocked] = useState(false);
   const [hoverNode, setHoverNode] = useState<any>(null);
   const [hoverLink, setHoverLink] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -55,22 +58,30 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
     return map;
   }, [categories]);
 
-  // Build nodes and edges
+  // Build nodes and edges with wide separation
   const { nodes, links, nodeMap } = useMemo(() => {
     const nList: any[] = [];
     const lList: any[] = [];
     const nMap = new Map<string, any>();
 
-    // 1. Add Category Hub nodes
-    categories.forEach((cat) => {
+    // 1. Add Category Hub nodes with extra wide orbital separation (900px+ radius)
+    const numCats = categories.length || 1;
+    const catOrbitRadius = Math.max(900, numCats * 400);
+
+    categories.forEach((cat, idx) => {
+      const color = catColorMap.get(cat.name.toLowerCase()) || "#2645D4";
+      const angle = (2 * Math.PI * idx) / numCats - Math.PI / 2;
       const hubId = `hub_${cat.name}`;
       const hubNode: any = {
         id: hubId,
         name: cat.name,
         color: "#111827", // Solid Black
-        val: 20,
+        catColor: color,  // Category accent ring
+        val: 28,
         isHub: true,
         categoryName: cat.name,
+        x: Math.round(Math.cos(angle) * catOrbitRadius),
+        y: Math.round(Math.sin(angle) * catOrbitRadius),
         neighbors: new Set<string>(),
         links: new Set<any>(),
       };
@@ -78,15 +89,34 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
       nMap.set(hubNode.id, hubNode);
     });
 
-    // 2. Add Idea nodes
+    // 2. Add Idea nodes spaced far out around their respective category hubs
+    const catIdeasCount = new Map<string, number>();
+    const catIdeasIndex = new Map<string, number>();
+    ideas.forEach((i) => {
+      catIdeasCount.set(i.category, (catIdeasCount.get(i.category) || 0) + 1);
+    });
+
     ideas.forEach((idea) => {
+      const totalInCat = catIdeasCount.get(idea.category) || 1;
+      const currentIdx = catIdeasIndex.get(idea.category) || 0;
+      catIdeasIndex.set(idea.category, currentIdx + 1);
+
+      const hubNode = nMap.get(`hub_${idea.category}`);
+      const hubX = hubNode?.x ?? 0;
+      const hubY = hubNode?.y ?? 0;
+
+      const angle = (2 * Math.PI * currentIdx) / totalInCat;
+      const ideaDistance = 320 + (currentIdx % 4) * 90; // 320px to 590px out from hub
+
       const ideaNode: any = {
         id: idea.id,
         name: idea.title,
         color: "#111827", // Solid Black
-        val: 8,
+        val: 10,
         isHub: false,
         ideaData: idea,
+        x: Math.round(hubX + Math.cos(angle) * ideaDistance),
+        y: Math.round(hubY + Math.sin(angle) * ideaDistance),
         neighbors: new Set<string>(),
         links: new Set<any>(),
       };
@@ -94,7 +124,7 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
       nMap.set(ideaNode.id, ideaNode);
     });
 
-    // 3. Category Hub links
+    // 3. Category Hub links (subtle translucent connectors)
     if (showCategoryLinks) {
       ideas.forEach((idea) => {
         const hubId = `hub_${idea.category}`;
@@ -104,7 +134,7 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
             source: idea.id,
             target: hubId,
             isCategoryLink: true,
-            color: `${catColorMap.get(idea.category.toLowerCase()) || "#D7DCE6"}33`,
+            color: "rgba(156, 163, 175, 0.22)",
             width: 1,
           };
           lList.push(l);
@@ -120,7 +150,7 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
       });
     }
 
-    // 4. Idea-to-idea connections
+    // 4. Idea-to-idea connections (Obsidian-style curved links)
     ideas.forEach((idea) => {
       (idea.links || []).forEach((link) => {
         if (nMap.has(link.ideaId)) {
@@ -129,7 +159,7 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
             source: idea.id,
             target: link.ideaId,
             isCategoryLink: false,
-            color: "var(--pen)",
+            color: "rgba(38, 69, 212, 0.45)",
             width: 2.2,
             reason: link.reason,
           };
@@ -150,51 +180,66 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
     return { nodes: nList, links: lList, nodeMap: nMap };
   }, [ideas, categories, catColorMap, showCategoryLinks]);
 
-  // Configure forces to separate main nodes widely across the canvas
+  // Obsidian Force Configuration: Separate main nodes widely and prevent clustering
   useEffect(() => {
     const applyForcesAndLayout = () => {
       if (fgRef.current) {
         const fg = fgRef.current;
-        const charge = fg.d3Force("charge");
-        if (charge) {
-          // Extra strong repulsion for category hubs (-1200) so they spread across opposite sides of the canvas!
-          // and -400 for regular ideas
-          charge.strength((n: any) => (n.isHub ? -1200 : -400));
-          charge.distanceMax(1200);
-        }
-        const link = fg.d3Force("link");
-        if (link) {
-          // Generous wide separation: 220px between hub and thoughts, 140px between linked thoughts
-          link.distance((l: any) => (l.isCategoryLink ? 220 : 140));
+
+        // 1. Center force: Set to 0 to completely prevent gravity from collapsing nodes inward
+        const center = fg.d3Force("center");
+        if (center) {
+          center.strength(0);
         }
 
-        // Unpin any previous positions and reheat simulation so the new wide distances take effect
+        // 2. Heavy Repulsion force (-9000 for hubs, -1500 for thoughts, radius 6000px)
+        const charge = fg.d3Force("charge");
+        if (charge) {
+          charge.strength((n: any) => (n.isHub ? -9000 : -1500));
+          charge.distanceMax(6000);
+        }
+
+        // 3. Wide link distances: 520px from hub to idea, 280px between linked thoughts
+        const link = fg.d3Force("link");
+        if (link) {
+          link.distance((l: any) => (l.isCategoryLink ? 520 : 280));
+        }
+
+        // 4. Collision Force: Prevents nodes from ever overlapping or crowding
+        fg.d3Force(
+          "collide",
+          forceCollide()
+            .radius((n: any) => (n.isHub ? 120 : 50))
+            .iterations(3)
+        );
+
+        // Unpin any previous positions so wide spacing takes effect immediately
         nodes.forEach((n) => {
           n.fx = undefined;
           n.fy = undefined;
         });
+
         fg.d3ReheatSimulation();
 
-        // After simulation expands, automatically zoom to fit so nodes fill the viewport!
+        // Smoothly fit camera around the expansive constellation
         setTimeout(() => {
-          fgRef.current?.zoomToFit(500, 70);
+          fgRef.current?.zoomToFit(700, 120);
         }, 500);
       }
     };
 
     applyForcesAndLayout();
-    const timer = setTimeout(applyForcesAndLayout, 200);
+    const timer = setTimeout(applyForcesAndLayout, 250);
     return () => clearTimeout(timer);
   }, [ideas.length, categories.length]);
 
-  // When engine stops, lock positions if isLocked is true so nodes never wander or drift
+  // When engine stops, lock positions if isLocked is true
   const handleEngineStop = useCallback(() => {
+    if (!isLocked) return;
     nodes.forEach((n) => {
       if (n.x !== undefined && n.y !== undefined) {
-        if (isLocked) {
-          n.fx = n.x;
-          n.fy = n.y;
-        }
+        n.fx = n.x;
+        n.fy = n.y;
         nodePositionsRef.current.set(n.id, {
           x: n.x,
           y: n.y,
@@ -211,7 +256,6 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
     setIsLocked(nextLocked);
 
     if (nextLocked) {
-      // Pin all nodes in place
       nodes.forEach((n) => {
         if (n.x !== undefined && n.y !== undefined) {
           n.fx = n.x;
@@ -219,13 +263,12 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
           nodePositionsRef.current.set(n.id, {
             x: n.x,
             y: n.y,
-            fx: n.x,
-            fy: n.y,
+            fx: n.fx,
+            fy: n.fy,
           });
         }
       });
     } else {
-      // Unpin nodes and let gentle simulation reheat
       nodes.forEach((n) => {
         n.fx = undefined;
         n.fy = undefined;
@@ -254,10 +297,13 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
     });
     if (fgRef.current) {
       fgRef.current.d3ReheatSimulation();
+      setTimeout(() => {
+        fgRef.current?.zoomToFit(600, 100);
+      }, 400);
     }
   };
 
-  // Pin a dragged node in its new spot
+  // Drag node
   const handleNodeDragEnd = useCallback((node: any) => {
     node.fx = node.x;
     node.fy = node.y;
@@ -269,12 +315,12 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
     });
   }, []);
 
-  // Compute highlighted nodes when hovering a node
+  // Compute highlighted nodes when hovering
   const highlightNodes = useMemo(() => {
     const set = new Set<string>();
     if (hoverNode) {
       set.add(hoverNode.id);
-      hoverNode.neighbors.forEach((neighborId: string) => set.add(neighborId));
+      hoverNode.neighbors?.forEach((neighborId: string) => set.add(neighborId));
     }
     return set;
   }, [hoverNode]);
@@ -282,7 +328,7 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
   const highlightLinks = useMemo(() => {
     const set = new Set<any>();
     if (hoverNode) {
-      hoverNode.links.forEach((l: any) => set.add(l));
+      hoverNode.links?.forEach((l: any) => set.add(l));
     }
     return set;
   }, [hoverNode]);
@@ -297,21 +343,23 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
     );
 
     if (matched && fgRef.current) {
-      fgRef.current.centerAt(matched.x, matched.y, 800);
-      fgRef.current.zoom(2.5, 800);
+      fgRef.current.centerAt(matched.x, matched.y, 700);
+      fgRef.current.zoom(2.6, 700);
       setHoverNode(matched);
     }
   };
 
+  // Touch / Click Zoom In Smoothly
   const handleNodeClick = useCallback(
     (node: any) => {
-      // Zoom in pronouncedly and center smoothly on the touched/clicked node
+      if (!node) return;
+
+      // Center and zoom in smoothly as requested
       if (fgRef.current && node.x !== undefined && node.y !== undefined) {
-        fgRef.current.centerAt(node.x, node.y, 500);
-        const currentZoom = fgRef.current.zoom();
-        // Zoom in to at least 2.6x (or 1.6x of current) so zoom is unmistakable
+        const currentZoom = fgRef.current.zoom() || 1;
         const targetZoom = Math.max(currentZoom * 1.6, 2.6);
-        fgRef.current.zoom(targetZoom, 500);
+        fgRef.current.centerAt(node.x, node.y, 600);
+        fgRef.current.zoom(targetZoom, 600);
       }
 
       setHoverNode(node);
@@ -325,6 +373,20 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
     },
     [setSelectedCategory, onSelectIdea]
   );
+
+  const handleZoomIn = () => {
+    if (fgRef.current) {
+      const current = fgRef.current.zoom() || 1;
+      fgRef.current.zoom(current * 1.5, 400);
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (fgRef.current) {
+      const current = fgRef.current.zoom() || 1;
+      fgRef.current.zoom(Math.max(current * 0.67, 0.1), 400);
+    }
+  };
 
   return (
     <div className="relative w-full h-[calc(100vh-140px)] min-h-[500px] border border-[var(--line)] rounded-[18px] overflow-hidden bg-white shadow-[var(--shadow)] flex">
@@ -355,12 +417,12 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
             }`}
             title={
               isLocked
-                ? "Browsing mode: Nodes stay completely still when touched. Click to unlock physics and drag to arrange."
-                : "Physics active: Touch and drag nodes to arrange. Click to lock them still in place."
+                ? "Nodes Locked: Nodes stay still. Click to unlock physics and drag to arrange."
+                : "Physics Active: Touch and drag nodes freely. Click to lock them in place."
             }
           >
             {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5 text-[var(--muted)]" />}
-            <span>{isLocked ? "Nodes Still (Locked)" : "Physics Active"}</span>
+            <span>{isLocked ? "Nodes Locked" : "Physics Active"}</span>
           </button>
 
           {/* Re-cluster Button */}
@@ -368,7 +430,7 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
             type="button"
             onClick={handleReheat}
             className="p-1.5 rounded-full bg-white/95 backdrop-blur-sm border border-[var(--line)] shadow-sm hover:border-[var(--muted)] text-[var(--ink)]"
-            title="Settle & Rearrange Nodes"
+            title="Rearrange & Expand Graph"
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
@@ -383,19 +445,37 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
             <span className="hidden sm:inline">Category Hubs</span>
           </button>
 
-          {/* Zoom reset */}
-          <button
-            type="button"
-            onClick={() => fgRef.current?.zoomToFit(500, 40)}
-            className="p-1.5 rounded-full bg-white/95 backdrop-blur-sm border border-[var(--line)] shadow-sm hover:border-[var(--muted)] text-[var(--ink)]"
-            title="Reset Zoom"
-          >
-            <Maximize2 className="w-3.5 h-3.5" />
-          </button>
+          {/* Quick Zoom Buttons */}
+          <div className="flex items-center rounded-full bg-white/95 backdrop-blur-sm border border-[var(--line)] shadow-sm overflow-hidden">
+            <button
+              type="button"
+              onClick={handleZoomIn}
+              className="p-1.5 hover:bg-[var(--surface-hover)] text-[var(--ink)] border-r border-[var(--line)]"
+              title="Zoom In"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleZoomOut}
+              className="p-1.5 hover:bg-[var(--surface-hover)] text-[var(--ink)] border-r border-[var(--line)]"
+              title="Zoom Out"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => fgRef.current?.zoomToFit(600, 100)}
+              className="p-1.5 hover:bg-[var(--surface-hover)] text-[var(--ink)]"
+              title="Fit to Screen"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
-        {/* Legend / Hover reason tooltip */}
-        <div className="absolute bottom-4 left-4 z-20 pointer-events-none">
+        {/* Legend / Info bar */}
+        <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2">
           {hoverLink?.reason ? (
             <div className="px-3 py-1.5 rounded-lg bg-[var(--ink)] text-white text-xs font-mono shadow-lg animate-in fade-in">
               <span className="text-[var(--hl)] font-bold mr-1">Connection:</span>
@@ -403,38 +483,49 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
             </div>
           ) : (
             <div className="px-3 py-1.5 rounded-lg bg-white/90 backdrop-blur-sm border border-[var(--line)] text-[11px] font-mono text-[var(--muted)] shadow-sm">
-              {nodes.length} nodes &bull; {links.length} links &bull; Touch / click to inspect
+              {nodes.length} nodes &bull; {links.length} links &bull; Touch / click any node to zoom in
             </div>
+          )}
+
+          {hoverNode && (
+            <button
+              type="button"
+              onClick={() => setHoverNode(null)}
+              className="px-2.5 py-1 rounded-lg bg-white/90 backdrop-blur-sm border border-[var(--line)] text-[11px] font-mono text-[var(--pen)] hover:bg-[var(--paper)] shadow-sm"
+            >
+              Clear selection
+            </button>
           )}
         </div>
 
-        {/* 2D Force Graph with Stable Physics */}
+        {/* 2D Force Graph */}
         <ForceGraph2D
           ref={fgRef}
           graphData={{ nodes, links }}
           enableNodeDrag={!isLocked}
           enablePanInteraction={true}
           enableZoomInteraction={true}
-          warmupTicks={180}
-          cooldownTicks={30}
-          d3AlphaDecay={0.06}
-          d3VelocityDecay={0.7}
+          warmupTicks={0}
+          cooldownTicks={100}
+          d3AlphaDecay={0.02}
+          d3VelocityDecay={0.4}
           onEngineStop={handleEngineStop}
           onNodeDragEnd={handleNodeDragEnd}
           nodeRelSize={7}
+          linkCurvature={(link: any) => (link.isCategoryLink ? 0 : 0.16)}
           linkWidth={(link: any) =>
             highlightLinks.has(link) ? 3 : link.width || 1
           }
           linkColor={(link: any) => {
-            if (highlightLinks.has(link)) return "var(--pen)";
-            if (hoverNode && !highlightLinks.has(link)) return "#E5E7EB33";
-            return link.color || "#D7DCE6";
+            if (highlightLinks.has(link)) return "#2645D4";
+            if (hoverNode && !highlightLinks.has(link)) return "rgba(229, 231, 235, 0.25)";
+            return link.color || "rgba(209, 213, 219, 0.6)";
           }}
           nodePointerAreaPaint={(node: any, color, ctx) => {
-            // Generous hit-box area so clicking/touching always triggers onNodeClick
+            // Generous touch hit-box ensuring clicks & mobile touches always hit
             ctx.fillStyle = color;
             ctx.beginPath();
-            ctx.arc(node.x, node.y, node.isHub ? 30 : 22, 0, 2 * Math.PI, false);
+            ctx.arc(node.x, node.y, node.isHub ? 36 : 26, 0, 2 * Math.PI, false);
             ctx.fill();
           }}
           nodeCanvasObject={(node: any, ctx, globalScale) => {
@@ -443,30 +534,38 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
             const isDimmed = hoverNode && !isConnected;
 
             const isHub = node.isHub;
-            const radius = isHub ? 12 : 7;
+            // Dynamic Obsidian-grade sizing proportional to node connections
+            const degree = node.neighbors?.size || 0;
+            const radius = isHub ? 15 : Math.min(6.5 + degree * 1.5, 12);
             const label = node.name;
             const fontSize = isHub ? 14 / globalScale : 11 / globalScale;
 
             ctx.beginPath();
             ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI, false);
 
-            // Change node color to solid BLACK as requested
+            // Solid Black Node Color as requested
             ctx.fillStyle = isDimmed ? "#9CA3AF" : "#111827";
             ctx.fill();
 
-            // Accent outline on hover or hubs
+            // Distinct category accent ring or active focus outline
             if (isHovered || isConnected) {
-              ctx.strokeStyle = "var(--pen)";
-              ctx.lineWidth = 3 / globalScale;
+              ctx.strokeStyle = "#2645D4";
+              ctx.lineWidth = 3.5 / globalScale;
               ctx.stroke();
             } else if (isHub) {
-              ctx.strokeStyle = "#4B5563";
-              ctx.lineWidth = 2 / globalScale;
+              // Accent ring around category hubs
+              ctx.strokeStyle = node.catColor || "#4B5563";
+              ctx.lineWidth = 2.5 / globalScale;
+              ctx.stroke();
+            } else {
+              // Crisp subtle outline for idea notes
+              ctx.strokeStyle = "#374151";
+              ctx.lineWidth = 1 / globalScale;
               ctx.stroke();
             }
 
-            // Draw crisp black label on soft pill
-            if (isHub || isHovered || isConnected || globalScale >= 1.1) {
+            // Draw crisp Obsidian-style label
+            if (isHub || isHovered || isConnected || globalScale >= 0.85) {
               ctx.font = `${isHub ? "800" : "600"} ${fontSize}px sans-serif`;
               ctx.textAlign = "center";
               ctx.textBaseline = "middle";
@@ -474,7 +573,7 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
               const textWidth = ctx.measureText(label).width;
               const bWidth = textWidth + 10 / globalScale;
               const bHeight = fontSize + 6 / globalScale;
-              const labelY = node.y + (isHub ? 18 : 13) / globalScale;
+              const labelY = node.y + (radius + 9) / globalScale;
 
               ctx.fillStyle = isDimmed ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.95)";
               ctx.fillRect(
@@ -491,10 +590,6 @@ export function GraphView({ onSelectIdea }: GraphViewProps) {
           onNodeHover={(node: any) => setHoverNode(node || null)}
           onLinkHover={(link: any) => setHoverLink(link || null)}
           onNodeClick={handleNodeClick}
-          onBackgroundClick={() => {
-            setHoverNode(null);
-            fgRef.current?.zoomToFit(500, 70);
-          }}
         />
       </div>
 
