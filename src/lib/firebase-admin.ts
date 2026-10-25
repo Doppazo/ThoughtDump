@@ -65,9 +65,12 @@ export async function verifyAuthToken(authHeader: string | null): Promise<string
 
   const token = authHeader.substring(7).trim();
 
-  // Allow demo token for local testing if credentials are not yet populated
+  // Demo tokens only work while Firebase isn't set up (local testing).
+  // Once Firebase is configured, they're refused, so nobody can read
+  // another person's notes by guessing a demo token.
   if (token.startsWith("demo-token-")) {
-    return token.replace("demo-token-", "");
+    if (adminAuth) throw new Error("Unauthorized: demo sign-in is off once Firebase is set up");
+    return "demo-" + token.slice("demo-token-".length).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
   }
 
   if (adminAuth) {

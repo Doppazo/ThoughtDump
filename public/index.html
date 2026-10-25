@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta name="color-scheme" content="dark">
+  <title>Thought Dump</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Gear icon in the top corner: opens Settings -->
+    <button class="gear" id="gear" type="button" aria-label="Settings"></button>
+
+    <!-- The screen for the selected tab is drawn in here -->
+    <main id="screen" tabindex="-1"></main>
+
+    <!-- Soft fade behind the floating tab bar -->
+    <div class="fade" aria-hidden="true"></div>
+
+    <!-- Floating tab bar -->
+    <nav class="tabbar" id="tabbar" aria-label="Main"></nav>
+  </div>
+
+  <!-- Sign-in, server connection, and the vault (.md notes saved in your account) -->
+  <script src="auth.js"></script>
+  <script src="api.js"></script>
+  <script src="vault.js"></script>
+  <script src="player.js"></script>
+  <script src="force-graph.min.js"></script>
+  <script src="screens/signin.js"></script>
+  <!-- One file per screen. Each one adds itself to window.Screens -->
+  <script src="screens/capture.js"></script>
+  <script src="screens/brain.js"></script>
+  <script src="screens/ask.js"></script>
+  <script src="screens/todo.js"></script>
+  <script src="screens/graph.js"></script>
+  <script src="screens/settings.js"></script>
+  <!-- The tab bar and switching between screens -->
+  <script src="app.js"></script>
+</body>
+</html>

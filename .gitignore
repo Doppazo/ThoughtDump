@@ -16,6 +16,7 @@
 .env
 .env*.local
 *.env
+env.download
 *.pem
 serviceAccountKey.json
 firebase-admin-key.json
@@ -37,3 +38,13 @@ yarn-error.log*
 # TypeScript cache
 *.tsbuildinfo
 next-env.d.ts
+
+# Local tools
+.vercel
+.agents/
+.claude/
+brag-output/
+*.pptx
+*.jpeg
+*.jpg
+
