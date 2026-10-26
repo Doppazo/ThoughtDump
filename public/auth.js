@@ -1,11 +1,11 @@
-// Sign-in. Uses Firebase login (Google, email, or guest) once Firebase is set up.
-// Until then: a demo mode with one local guest per device (for testing only).
+// Sign-in. Uses Supabase login (Google, email, or guest) once Supabase is set up.
+// Until then: a demo mode with one local guest per device (for offline testing).
 (function () {
   const DEMO_KEY = "thoughtdump.demoUser";
-  const FB = "https://www.gstatic.com/firebasejs/11.3.0/";
+  const SUPABASE_CDN = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
   const listeners = [];
   let user = null;
-  let fbAuth = null;
+  let sbClient = null;
   let configured = false;
 
   const emit = () => listeners.forEach((f) => { try { f(user); } catch (e) { console.error(e); } });
@@ -13,8 +13,10 @@
     get() { try { return JSON.parse(localStorage.getItem(DEMO_KEY) || "null"); } catch { return null; } },
     set(v) { try { v ? localStorage.setItem(DEMO_KEY, JSON.stringify(v)) : localStorage.removeItem(DEMO_KEY); } catch {} },
   };
+
   function loadScript(src) {
     return new Promise((resolve, reject) => {
+      if (document.querySelector(`script[src="${src}"]`)) return resolve();
       const s = document.createElement("script");
       s.src = src;
       s.onload = resolve;
@@ -22,47 +24,68 @@
       document.head.appendChild(s);
     });
   }
-  const fromFirebase = (u) => u ? { uid: u.uid, email: u.email, name: u.displayName || u.email || "Guest", guest: u.isAnonymous } : null;
+
+  const fromSupabase = (u) => {
+    if (!u) return null;
+    const name = u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split("@")[0] || "User";
+    return {
+      uid: u.id,
+      email: u.email || "",
+      name: u.is_anonymous ? "Guest" : name,
+      guest: Boolean(u.is_anonymous),
+    };
+  };
 
   const ready = (async () => {
     let cfg = null;
-    try { cfg = (await (await fetch("/api/config")).json()).firebase; } catch {}
-    if (cfg) {
+    try {
+      const res = await (await fetch("/api/config")).json();
+      cfg = res.supabase;
+    } catch {}
+
+    if (cfg && cfg.url && cfg.anonKey) {
       try {
-        await loadScript(FB + "firebase-app-compat.js");
-        await loadScript(FB + "firebase-auth-compat.js");
-        firebase.initializeApp(cfg);
-        fbAuth = firebase.auth();
+        await loadScript(SUPABASE_CDN);
+        const { createClient } = window.supabase;
+        sbClient = createClient(cfg.url, cfg.anonKey);
         configured = true;
-        try { await fbAuth.getRedirectResult(); } catch (e) { console.warn(e); }
-        await new Promise((resolve) => {
-          fbAuth.onAuthStateChanged((u) => { user = fromFirebase(u); resolve(); emit(); });
+
+        // Check active session
+        const { data: { session } } = await sbClient.auth.getSession();
+        user = fromSupabase(session?.user);
+
+        // Listen for auth changes
+        sbClient.auth.onAuthStateChange((_event, session) => {
+          user = fromSupabase(session?.user);
+          emit();
         });
+
+        emit();
         return;
       } catch (e) {
-        console.error("Firebase sign-in couldn't start:", e);
+        console.error("Supabase sign-in couldn't start:", e);
       }
     }
+
     user = store.get();
   })();
 
   // Friendly messages for common sign-in problems
   function errorMessage(e) {
-    const code = (e && e.code) || "";
-    return ({
-      "auth/invalid-email": "That email doesn't look right.",
-      "auth/missing-password": "Enter a password.",
-      "auth/weak-password": "Use at least 6 characters for the password.",
-      "auth/email-already-in-use": "There's already an account with that email. Sign in instead.",
-      "auth/invalid-credential": "Wrong email or password.",
-      "auth/wrong-password": "Wrong email or password.",
-      "auth/user-not-found": "No account with that email. Create one instead.",
-      "auth/too-many-requests": "Too many tries. Wait a minute and try again.",
-      "auth/popup-closed-by-user": "Sign-in window was closed.",
-      "auth/operation-not-allowed": "This sign-in method isn't turned on in Firebase yet.",
-      "auth/admin-restricted-operation": "Guest sign-in isn't turned on in Firebase yet.",
-      "auth/network-request-failed": "No internet connection.",
-    })[code] || "Couldn't sign in. Try again.";
+    const msg = (e && (e.message || e.error_description)) || "";
+    if (/invalid login credentials|invalid email or password/i.test(msg)) {
+      return "Wrong email or password.";
+    }
+    if (/email not confirmed/i.test(msg)) {
+      return "Please confirm your email address or check your inbox.";
+    }
+    if (/user already registered/i.test(msg)) {
+      return "An account with that email already exists. Sign in instead.";
+    }
+    if (/password should be at least/i.test(msg)) {
+      return "Password must be at least 6 characters.";
+    }
+    return msg || "Couldn't sign in. Try again.";
   }
 
   window.Auth = {
@@ -71,29 +94,56 @@
     get configured() { return configured; },
     onChange(f) { listeners.push(f); },
     async signInGoogle() {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      try { await fbAuth.signInWithPopup(provider); }
-      catch (e) {
-        if (e && (e.code === "auth/popup-blocked" || e.code === "auth/operation-not-supported-in-this-environment")) await fbAuth.signInWithRedirect(provider);
-        else throw e;
-      }
+      if (!sbClient) throw new Error("Supabase is not configured.");
+      const { error } = await sbClient.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+      if (error) throw error;
     },
-    signInEmail: (email, pass) => fbAuth.signInWithEmailAndPassword(email, pass),
-    signUpEmail: (email, pass) => fbAuth.createUserWithEmailAndPassword(email, pass),
+    async signInEmail(email, pass) {
+      if (!sbClient) throw new Error("Supabase is not configured.");
+      const { data, error } = await sbClient.auth.signInWithPassword({
+        email,
+        password: pass,
+      });
+      if (error) throw error;
+      return data;
+    },
+    async signUpEmail(email, pass) {
+      if (!sbClient) throw new Error("Supabase is not configured.");
+      const { data, error } = await sbClient.auth.signUp({
+        email,
+        password: pass,
+      });
+      if (error) throw error;
+      return data;
+    },
     async continueAsGuest() {
-      if (configured) { await fbAuth.signInAnonymously(); return; }
+      if (configured && sbClient) {
+        const { error } = await sbClient.auth.signInAnonymously();
+        if (error) throw error;
+        return;
+      }
       user = { uid: "local" + Math.random().toString(36).slice(2, 12), name: "Guest", guest: true, demo: true };
       store.set(user);
       emit();
     },
     async signOut() {
       store.set(null);
-      if (fbAuth) await fbAuth.signOut();
+      if (sbClient) {
+        await sbClient.auth.signOut();
+      }
       user = null;
       emit();
     },
     async token() {
-      if (fbAuth && fbAuth.currentUser) return fbAuth.currentUser.getIdToken();
+      if (sbClient) {
+        const { data: { session } } = await sbClient.auth.getSession();
+        if (session && session.access_token) return session.access_token;
+      }
       if (user && user.demo) return "demo-token-" + user.uid;
       const e = new Error("Not signed in");
       e.code = "auth";

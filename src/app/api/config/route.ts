@@ -1,14 +1,14 @@
-// Public Firebase settings for the sign-in screen (these are safe to share;
-// secret keys stay on the server). Returns firebase: null until Firebase is set up.
+// Public Supabase configuration for client sign-in and vault storage.
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const cfg = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  const supabase = {
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   };
-  const ready = Boolean(cfg.apiKey && cfg.projectId && cfg.apiKey !== "your_firebase_api_key");
-  return NextResponse.json({ firebase: ready ? cfg : null });
+  const ready = Boolean(supabase.url && supabase.anonKey);
+  return NextResponse.json({
+    supabase: ready ? supabase : null,
+    firebase: null,
+  });
 }

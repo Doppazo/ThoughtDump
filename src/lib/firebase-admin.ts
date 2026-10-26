@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+import { verifyAuthToken as verifySupabaseToken, usingSupabase } from "@/lib/supabase-server";
 
 const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
@@ -59,6 +60,10 @@ export const adminDb = admin.apps.length ? admin.firestore() : null;
  * Used strictly in server-side API routes.
  */
 export async function verifyAuthToken(authHeader: string | null): Promise<string> {
+  if (usingSupabase()) {
+    return verifySupabaseToken(authHeader);
+  }
+
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     throw new Error("Missing or invalid Authorization header");
   }

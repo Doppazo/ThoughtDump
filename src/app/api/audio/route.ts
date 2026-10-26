@@ -1,7 +1,7 @@
 // Voice recordings in the user's vault.
 // POST ?path=audio/<name>: upload raw audio bytes. GET ?path=: play/download it.
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAuthToken } from "@/lib/firebase/admin";
+import { verifyAuthToken } from "@/lib/supabase-server";
 import { getAudio, putAudio, validPath, MAX_AUDIO } from "@/lib/vault-store";
 
 async function uidFrom(req: NextRequest) {

@@ -1,7 +1,7 @@
 // The signed-in user's vault files.
 // GET: list all files. PUT {path, data}: save a text file. DELETE ?path=: remove a file.
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAuthToken } from "@/lib/firebase/admin";
+import { verifyAuthToken } from "@/lib/supabase-server";
 import { listFiles, putText, removeFile, validPath, usingFirebase, MAX_TEXT } from "@/lib/vault-store";
 
 async function uidFrom(req: NextRequest) {

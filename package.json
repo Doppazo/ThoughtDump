@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.0",
+    "@supabase/supabase-js": "^2.118.0",
     "@types/jszip": "^3.4.0",
     "clsx": "^2.1.1",
     "firebase": "^11.3.0",
