@@ -15,8 +15,42 @@
     hub: "#FFFFFF",
   };
 
+  let activeGraph = null;
+  let activeResizeHandler = null;
+  const textWidthCache = new Map();
+
+  function getTextWidth(ctx, text, font) {
+    const key = `${font}::${text}`;
+    let w = textWidthCache.get(key);
+    if (w === undefined) {
+      ctx.font = font;
+      w = ctx.measureText(text).width;
+      textWidthCache.set(key, w);
+    }
+    return w;
+  }
+
   window.Screens.graph = {
+    unmount() {
+      if (activeResizeHandler) {
+        window.removeEventListener("resize", activeResizeHandler);
+        activeResizeHandler = null;
+      }
+      if (activeGraph) {
+        try {
+          activeGraph.pauseAnimation();
+          if (typeof activeGraph._destructor === "function") {
+            activeGraph._destructor();
+          }
+        } catch (_) {}
+        activeGraph = null;
+      }
+    },
+
     async render(el) {
+      // Clean up any existing graph instance before rendering
+      window.Screens.graph.unmount();
+
       el.innerHTML = `
         <div class="graph-screen">
           <div class="graph-bar">
@@ -92,10 +126,12 @@
         const hubAngle = -Math.PI / 2 + (2 * Math.PI * i) / (numCats || 1);
         const hubX = Math.round(Math.cos(hubAngle) * catOrbitRadius);
         const hubY = Math.round(Math.sin(hubAngle) * catOrbitRadius);
+        const count = (categoryMap.get(cat) || []).length;
         const hubNode = {
           id: "hub_" + cat,
           title: cat,
           name: cat,
+          count,
           isHub: true,
           val: 26,
           category: cat,
@@ -152,17 +188,17 @@
         });
       });
 
-      // 3. Build Edges (Category Hub links + Direct Wikilinks)
+      // 3. Build Edges (Category Hub links, Bridge links + Direct Wikilinks)
       const rawLinks = [];
       const linkKeySet = new Set();
 
-      function addLink(sourceId, targetId, isCategoryLink) {
+      function addLink(sourceId, targetId, isCategoryLink, isSecondary = false) {
         if (!sourceId || !targetId || sourceId === targetId) return;
-        const key = [sourceId, targetId].sort().join("::") + (isCategoryLink ? "::cat" : "::dir");
+        const key = [sourceId, targetId].sort().join("::") + (isCategoryLink ? (isSecondary ? "::sec" : "::cat") : "::dir");
         if (linkKeySet.has(key)) return;
         linkKeySet.add(key);
 
-        const link = { source: sourceId, target: targetId, isCategoryLink };
+        const link = { source: sourceId, target: targetId, isCategoryLink, isSecondary };
         rawLinks.push(link);
 
         const srcNode = nodeMap.get(sourceId);
@@ -175,10 +211,17 @@
         }
       }
 
-      // 3a. Connect each note to its category hub
+      // 3a. Connect each note to its primary category hub and secondary category hubs
       allNotes.forEach((n) => {
-        const cat = asList(n.meta && n.meta.categories).map(Vault.unlink)[0] || "General";
-        addLink(n.path, "hub_" + cat, true);
+        const cats = asList(n.meta && n.meta.categories).map(Vault.unlink);
+        const primaryCat = cats[0] || "General";
+        addLink(n.path, "hub_" + primaryCat, true, false);
+
+        cats.slice(1).forEach((secCat) => {
+          if (secCat && secCat !== primaryCat && nodeMap.has("hub_" + secCat)) {
+            addLink(n.path, "hub_" + secCat, true, true);
+          }
+        });
       });
 
       // 3b. Connect note-to-note direct links
@@ -192,7 +235,7 @@
           const tClean = Vault.unlink(rawTarget).trim().toLowerCase();
           const targetNote = byName.get(tClean);
           if (targetNote && targetNote.path !== n.path) {
-            addLink(n.path, targetNote.path, false);
+            addLink(n.path, targetNote.path, false, false);
           }
         });
       });
@@ -227,6 +270,8 @@
       const width = rect.width || container.clientWidth || 360;
       const height = rect.height || container.clientHeight || 560;
 
+      const isTouch = typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0);
+
       const graph = ForceGraph()(container)
         .width(width)
         .height(height)
@@ -234,6 +279,7 @@
         .graphData({ nodes: rawNodes, links: getVisibleLinks() })
         .nodeRelSize(4)
         .nodeVal((node) => node.val)
+        .enableNodeDrag(!isTouch) // on mobile/touch, node drag blocks smooth canvas panning
         .nodeCanvasObject((node, ctx, globalScale) => {
           const isHovered = hoverNode === node;
           const isConnected = highlightNodes.has(node);
@@ -244,18 +290,20 @@
 
           const radius = node.isHub ? 15 : 7;
           const color = node.isHub ? "#FFFFFF" : TYPE_COLORS[node.type] || "#F6C343";
+          const px = Math.round(node.x);
+          const py = Math.round(node.y);
 
           // Glowing outer ring for hovered / connected nodes
           if (isHovered || (hoverNode && isConnected)) {
             ctx.beginPath();
-            ctx.arc(node.x, node.y, radius + 5, 0, 2 * Math.PI, false);
+            ctx.arc(px, py, radius + 5, 0, 2 * Math.PI, false);
             ctx.fillStyle = node.isHub ? "rgba(255, 255, 255, 0.22)" : color + "44";
             ctx.fill();
           }
 
           // Main node circle
           ctx.beginPath();
-          ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI, false);
+          ctx.arc(px, py, radius, 0, 2 * Math.PI, false);
           ctx.fillStyle = color;
           ctx.fill();
 
@@ -266,41 +314,51 @@
             ctx.stroke();
           }
 
-          // Label
-          const showLabel = node.isHub || isHovered || isConnected || globalScale > 0.82;
+          // Level of Detail (LoD) text rendering:
+          // Hubs are always labeled with count badge.
+          // Note labels are shown if: hovered, connected, or when zoomed in close (globalScale >= 1.25)
+          const showLabel = node.isHub || isHovered || isConnected || globalScale >= 1.25;
           if (showLabel) {
-            const label = node.isHub ? node.name.toUpperCase() : node.name;
+            const label = node.isHub ? `${node.name.toUpperCase()} (${node.count || 0})` : node.name;
             const fontSize = Math.max(10, Math.min(22, (node.isHub ? 12 : 10) / Math.max(0.65, globalScale)));
-            ctx.font = node.isHub ? `600 ${fontSize}px Inter, sans-serif` : `500 ${fontSize}px Inter, sans-serif`;
+            const font = node.isHub ? `600 ${fontSize}px Inter, sans-serif` : `500 ${fontSize}px Inter, sans-serif`;
+            ctx.font = font;
             ctx.textAlign = "center";
             ctx.textBaseline = "top";
 
-            const textY = node.y + radius + 4;
-            const metrics = ctx.measureText(label);
+            const textY = py + radius + 4;
+            const textWidth = getTextWidth(ctx, label, font);
             const padX = 5;
             const padY = 2;
 
             // Semi-transparent pill backdrop for crisp legibility over crossing lines
             ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
-            ctx.fillRect(node.x - metrics.width / 2 - padX, textY - padY, metrics.width + padX * 2, fontSize + padY * 2);
+            ctx.fillRect(px - textWidth / 2 - padX, textY - padY, textWidth + padX * 2, fontSize + padY * 2);
 
             ctx.fillStyle = node.isHub ? "#FFFFFF" : isHovered ? "#FFFFFF" : "#E5E5EA";
-            ctx.fillText(label, node.x, textY);
+            ctx.fillText(label, px, textY);
           }
 
           ctx.restore();
         })
+        .linkLineDash((link) => (link.isSecondary ? [3, 4] : null))
         .linkColor((link) => {
           if (hoverNode) {
             if (highlightLinks.has(link)) {
+              if (link.isSecondary) return "rgba(255, 255, 255, 0.45)";
               return link.isCategoryLink ? "rgba(255, 255, 255, 0.65)" : "#F6C343";
             }
             return "rgba(255, 255, 255, 0.03)";
           }
+          if (link.isSecondary) return "rgba(255, 255, 255, 0.08)";
           return link.isCategoryLink ? "rgba(255, 255, 255, 0.12)" : "rgba(246, 195, 67, 0.82)";
         })
         .linkWidth((link) => {
-          if (hoverNode && highlightLinks.has(link)) return link.isCategoryLink ? 1.8 : 3.0;
+          if (hoverNode && highlightLinks.has(link)) {
+            if (link.isSecondary) return 1.4;
+            return link.isCategoryLink ? 1.8 : 3.0;
+          }
+          if (link.isSecondary) return 0.8;
           return link.isCategoryLink ? 1 : 2.2;
         })
         .linkCurvature((link) => (link.isCategoryLink ? 0 : 0.16))
@@ -319,6 +377,8 @@
             window.Screens.brain.open(node.path, { from: "graph" });
           }
         });
+
+      activeGraph = graph;
 
       // Fit initially
       setTimeout(() => {
@@ -394,6 +454,7 @@
       function selectSearchResult(node) {
         searchResults.hidden = true;
         searchInput.value = node.name;
+        searchInput.blur(); // immediately dismiss mobile soft keyboard
         hoverNode = node;
         updateHighlight(node);
         graph.centerAt(node.x, node.y, 800);
@@ -420,13 +481,13 @@
       });
 
       // Window resize handling
-      const resizeHandler = () => {
+      activeResizeHandler = () => {
         const r = container.getBoundingClientRect();
-        if (r.width > 0 && r.height > 0) {
-          graph.width(r.width).height(r.height);
+        if (r.width > 0 && r.height > 0 && activeGraph) {
+          activeGraph.width(r.width).height(r.height);
         }
       };
-      window.addEventListener("resize", resizeHandler);
+      window.addEventListener("resize", activeResizeHandler);
 
       function escapeHtml(s) {
         return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");

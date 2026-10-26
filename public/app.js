@@ -17,6 +17,7 @@
   const barEl = document.getElementById("tabbar");
   const gearEl = document.getElementById("gear");
   let lastTab = DEFAULT; // where the gear's X takes you back to
+  let currentScreenId = null;
 
   // Build the tab buttons once
   TABS.forEach((t) => {
@@ -58,6 +59,14 @@
     gearEl.setAttribute("aria-pressed", String(onSettings));
 
     AudioPlayer.stopAll(); // don't keep playing on a screen you left
+    if (currentScreenId && window.Screens && window.Screens[currentScreenId]?.unmount) {
+      try {
+        window.Screens[currentScreenId].unmount();
+      } catch (err) {
+        console.warn("Error unmounting screen", currentScreenId, err);
+      }
+    }
+    currentScreenId = current;
     screenEl.innerHTML = "";
     const screen = window.Screens && window.Screens[current];
     if (screen) {

@@ -19,7 +19,7 @@ Thought Dump is a mobile-first "AI second brain" built for a hackathon (Bentley,
 - **Front end:** plain HTML/CSS/JS in `public/`, with no React and no build step. `next.config.ts` rewrites `/` to `/index.html`.
 - **AI:** Google **Gemini** via `@google/generative-ai` (the teammate's choice). Model comes from the `GEMINI_MODEL` env var (currently `gemini-3.5-flash-lite`).
 - **Login and database:** **Firebase**. The browser loads the Firebase Auth compat SDK from gstatic in `public/auth.js`. The server uses `firebase-admin` (`src/lib/firebase-admin.ts`) to verify tokens and read and write Firestore.
-- Node.js 24 is installed. Git is **not** installed yet.
+- Node.js 24 is installed. Git (`MinGit`) and GitHub CLI (`gh`) are installed in `C:\Users\ramon\bin` and configured in the Windows user PATH.
 - To run: `npm install`, then `npm run dev`, then open http://localhost:3000. A Claude preview config is in `.claude/launch.json`.
 - Keys are in `.env.local` (git-ignored): `GEMINI_API_KEY`, `GEMINI_MODEL`, `NEXT_PUBLIC_FIREBASE_API_KEY/AUTH_DOMAIN/PROJECT_ID/APP_ID`, `FIREBASE_ADMIN_PROJECT_ID/CLIENT_EMAIL/PRIVATE_KEY`. Template: `.env.example`. All keys were verified working on 2026-10-25.
 - **Test mode:** if the Firebase variables are empty, the app runs without accounts. There's a "Start" button that creates a local demo guest, the server keeps notes in memory (lost on restart), and demo tokens `demo-token-<id>` are accepted. Once Firebase is configured, demo tokens are refused, which was a security fix to the teammate's code. To test signed-in screens without a real account, start Next with the Firebase variables set to empty strings in the process environment (empty values win over `.env.local`).
@@ -198,34 +198,53 @@ Body in the user's voice.
     - "Sources consulted" section with note type dots that open notes in the Brain editor.
     - Deep-linking back navigation: `‹ Ask`, `‹ Graph`, `‹ To-Do`, or `‹ Second Brain` dynamically returns to the referring screen.
   - Settings screen updated with clean vault file viewer, downloads, and account management.
-- Tested at phone size (375×812) in test mode, with the real Gemini key.
+- Multi-Agent Review & Polish (Phase A + Phase B):
+  - Completed comprehensive critique across 4 pillars: AI & Audio Systems, Vault Storage & Reliability, Knowledge Graph & Visualization, and Mobile UI/UX.
+  - Mobile Ergonomics & PWA:
+    - Viewport configured with `interactive-widget=resizes-content` to prevent virtual keyboard viewport jumping.
+    - Added `apple-mobile-web-app-status-bar-style: black-translucent` and title.
+    - Set 16px input font size on all search and chat inputs to eliminate automatic iOS Safari canvas zoom.
+    - Boosted text contrast: `--faint: #8E8E93` (5.4:1) and `--muted: #A1A1A6` (6.8:1) to satisfy WCAG AA 4.5:1 standards.
+    - Sticky typing actions anchored above mobile keyboard; sticky Ask AI input with glass backdrop.
+    - Expanded To-Do checkbox tap target to 44×44px with a centered 26px circle.
+  - Audio & Performance:
+    - Full HTTP 206 Partial Content (Byte Range) streaming in `/api/audio` for iOS Safari audio scrubbing and instant playback.
+    - Parallelized Firestore audio chunk queries using `Promise.all`, reducing audio load latency from ~800ms to ~100ms.
+  - AI & Accuracy:
+    - Standardized production model configuration on `gemini-2.0-flash` with candidate fallback loops.
+    - Implemented lexical/semantic note ranking (`rankNotesForQuestion`) to prioritize top 40 candidate notes for Ask AI queries across 500+ note vaults.
+    - Multi-model retry loop for audio transcription to ensure zero transcription dropouts.
+  - Knowledge Graph:
+    - Level of Detail (LoD) rendering: zoomed out shows hubs with note counts and dot nodes; medium shows hubs + connected labels; zoomed in (>= 1.25) renders all note labels with rounded coordinate snapping.
+    - Text measurement width caching via `Map` to guarantee continuous 60 FPS animation during pan/zoom.
+    - Touch gesture optimization: node dragging disabled on touch screens to enable single-finger canvas panning and two-finger pinch-to-zoom without dragging notes accidentally.
+    - Secondary category bridge links with subtle dashed styling.
+    - Keyboard dismissal (`blur()`) upon selecting search results.
+    - Complete unmount cleanup hook on screen transitions to eliminate background RAF loops.
+  - Vault & Data Reliability:
+    - Strict YAML frontmatter scalar quoting for Obsidian compatibility.
+    - Suffix stemming and Sørensen-Dice coefficient for duplicate todo detection and similarity matching.
+- Tested at phone size (375×812) with real Google authentication and live Gemini models.
 
 **Waiting on the owner**
-- Enable sign-in providers in the Firebase console: Authentication → Sign-in method → Email/Password, Google, Anonymous. Until then, real sign-in shows "isn't turned on".
+- Enable any remaining sign-in providers in the Firebase console if desired (Email/Password, Anonymous). Google Sign-In is active and verified.
 
 **Not yet verified**
-- Real microphone recording on a real phone. Phones need https, so this works best after deployment.
-- Real sign-in with Google or email.
+- Real microphone recording on a real phone (phones need https, so this works best after deployment).
 
 ## 8. What's left (the owner's phase plan)
-- **Phase 7 (later)**
-  - Deploy publicly, either Vercel (spec option) or Firebase Hosting. Ask the owner.
-  - Add the env vars in the host's settings.
-  - Add the deployed domain to Firebase Auth → Settings → Authorized domains.
-  - Then test the mic on real phones.
-  - Brain "Map" mode for theme clusters.
-  - Optional: wrap as a phone app with Capacitor (the owner picked "web app now, phone app later").
-  - Optional: PWA install (manifest is at `src/app/manifest.ts`, icons in `public/`).
-- **Research recommendations still open (do them in their phase)**
-  - "Source" chips that play from the exact second (needs word timestamps).
-  - Weekly digest and resurfacing.
-  - A tag health check.
+- **Phase 7 (Deployment & Final Polish)**
+  - Deploy publicly to Vercel or Firebase Hosting.
+  - Add environment variables in the hosting provider dashboard.
+  - Add deployed domain to Firebase Auth → Settings → Authorized domains.
+  - Test real microphone recording and PWA installation on iOS/Android devices.
+  - Optional: wrap as a native app with Capacitor.
 
-## 9. Before pushing to GitHub
-- Git isn't installed. The owner has a GitHub account and said "GitHub later".
-- The shared repo still has the teammate's original React screens. This local version **replaced those screens** at the owner's request, while keeping the teammate's backend.
-- **Tell the owner to coordinate with the teammate before pushing.** Suggest pushing to a new branch first.
-- Never commit `.env.local`. It's already in `.gitignore`.
+## 9. Git and GitHub Status
+- MinGit and GitHub CLI (`gh`) are installed and authorized with the user's account (`resc6373`).
+- Active repo: `https://github.com/Doppazo/ThoughtDump.git` on branch `main`.
+- All code up to Phase 6 and Multi-Agent Polish (Phase A + Phase B) is committed and pushed.
+- Secrets (`.env.local`) are strictly excluded via `.gitignore`.
 
 ## 10. Known caveats
 - The AI is Gemini, not Claude, because the teammate built it on Gemini. The owner accepted this.

@@ -2,8 +2,10 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ThoughtType, ThoughtLink } from "@/types";
 
 const apiKey = process.env.GEMINI_API_KEY || "";
-const primaryModel = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
-const CANDIDATE_MODELS = Array.from(new Set([primaryModel, "gemini-3.5-flash-lite", "gemini-3-flash-preview", "gemini-3.8-flash"]));
+const primaryModel = process.env.GEMINI_MODEL && !process.env.GEMINI_MODEL.includes("3.")
+  ? process.env.GEMINI_MODEL
+  : "gemini-2.0-flash";
+const CANDIDATE_MODELS = Array.from(new Set([primaryModel, "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b"]));
 
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
@@ -193,12 +195,58 @@ export function fallbackSortDump(text: string): ProcessedThought[] {
   });
 }
 
+function rankNotesForQuestion(
+  question: string,
+  ideas: Array<{ id: string; title: string; summary: string; category: string; type?: string; done?: boolean; createdAt: number }>,
+  topK = 40
+) {
+  const qTerms = question
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+
+  if (qTerms.length === 0 || ideas.length <= topK) {
+    return ideas.slice(-topK);
+  }
+
+  const scored = ideas.map((idea) => {
+    let score = 0;
+    const titleLow = idea.title.toLowerCase();
+    const summaryLow = idea.summary.toLowerCase();
+    const catLow = idea.category.toLowerCase();
+    const typeLow = (idea.type || "").toLowerCase();
+
+    for (const term of qTerms) {
+      if (titleLow.includes(term)) score += 6;
+      if (summaryLow.includes(term)) score += 2;
+      if (catLow.includes(term)) score += 3;
+      if (typeLow.includes(term)) score += 2;
+    }
+    return { idea, score, time: idea.createdAt || 0 };
+  });
+
+  const topMatches = scored
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score || b.time - a.time)
+    .slice(0, topK)
+    .map((s) => s.idea);
+
+  if (topMatches.length < topK) {
+    const matchedIds = new Set(topMatches.map((m) => m.id));
+    const recent = ideas.filter((i) => !matchedIds.has(i.id)).slice(-(topK - topMatches.length));
+    return [...topMatches, ...recent];
+  }
+
+  return topMatches;
+}
+
 export async function askAIWithGemini(
   question: string,
   ideas: Array<{ id: string; title: string; summary: string; category: string; type?: string; done?: boolean; createdAt: number }>
 ): Promise<AskAIResult> {
-  const notes = ideas
-    .slice(-150)
+  const selectedNotes = rankNotesForQuestion(question, ideas, 40);
+  const notes = selectedNotes
     .map((i) => `- [${i.title}] (id: "${i.id}", ${i.category}, ${i.type || "note"}${i.done ? ", done" : ""}): ${i.summary}`)
     .join("\n");
 
@@ -244,10 +292,11 @@ function fallbackAskAI(
   question: string,
   ideas: Array<{ id: string; title: string; summary: string; category: string; type?: string; done?: boolean; createdAt: number }>
 ): AskAIResult {
+  const ranked = rankNotesForQuestion(question, ideas, 15);
   const q = question.toLowerCase();
   const qWords = q.split(/\s+/).filter((w) => w.length > 2);
 
-  const matched = ideas.filter((idea) => {
+  const matched = ranked.filter((idea) => {
     const text = `${idea.title} ${idea.summary} ${idea.category} ${idea.type || ""}`.toLowerCase();
     return qWords.some((word) => text.includes(word));
   });
@@ -274,20 +323,32 @@ export async function transcribeAudioWithGemini(
     throw new Error("GEMINI_API_KEY is not configured for audio transcription fallback.");
   }
 
-  const model = genAI.getGenerativeModel({ model: primaryModel });
-  const response = await model.generateContent([
-    {
-      inlineData: {
-        mimeType: mimeType.split(";")[0],
-        data: audioBuffer.toString("base64"),
-      },
-    },
-    {
-      text: "Transcribe the spoken words in this audio exactly as said. Return ONLY the transcription text, nothing else.",
-    },
-  ]);
+  const cleanMime = (mimeType || "audio/webm").split(";")[0].toLowerCase().trim();
+  const normalizedMime = cleanMime.includes("mp4") || cleanMime.includes("m4a") ? "audio/mp4" : cleanMime;
 
-  return response.response.text().trim();
+  for (const targetModel of CANDIDATE_MODELS) {
+    try {
+      const model = genAI.getGenerativeModel({ model: targetModel });
+      const response = await model.generateContent([
+        {
+          inlineData: {
+            mimeType: normalizedMime,
+            data: audioBuffer.toString("base64"),
+          },
+        },
+        {
+          text: "Transcribe the spoken words in this audio exactly as said. Return ONLY the transcription text, nothing else.",
+        },
+      ]);
+
+      const text = response.response.text().trim();
+      if (text) return text;
+    } catch (err) {
+      console.warn(`Gemini audio transcription with ${targetModel} failed:`, err);
+    }
+  }
+
+  throw new Error("All Gemini models failed to transcribe audio.");
 }
 
 // ---------- Thought Dump vault: organize a dump using the note rules ----------

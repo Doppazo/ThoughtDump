@@ -93,9 +93,13 @@ export async function getAudio(uid: string, path: string): Promise<{ buf: Buffer
     const snap = await filesCol(uid).doc(docId(path)).get();
     if (!snap.exists) return null;
     const rec = snap.data() as VaultFile;
+    const chunkCount = Number(rec.chunks || 0);
+    const chunkPromises = Array.from({ length: chunkCount }, (_, i) =>
+      audioCol(uid).doc(`${docId(path)}__${i}`).get()
+    );
+    const snaps = await Promise.all(chunkPromises);
     const parts: Buffer[] = [];
-    for (let i = 0; i < Number(rec.chunks || 0); i++) {
-      const c = await audioCol(uid).doc(`${docId(path)}__${i}`).get();
+    for (const c of snaps) {
       if (!c.exists) return null;
       parts.push(Buffer.from(String(c.data()?.data || ""), "base64"));
     }

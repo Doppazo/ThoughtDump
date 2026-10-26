@@ -102,9 +102,10 @@
   // ---------- Info block (YAML) ----------
   function scalar(v) {
     if (typeof v === "boolean" || typeof v === "number") return String(v);
+    if (v === null || v === undefined) return '""';
     const s = String(v);
     if (/^\d{4}-\d\d-\d\d(T\d\d:\d\d(:\d\d)?)?$/.test(s)) return s;
-    if (/^[A-Za-z][\w .'\-/]*$/.test(s) && !/^(true|false|null|yes|no|on|off)$/i.test(s)) return s;
+    if (/^[A-Za-z0-9][A-Za-z0-9 _\-./]*$/.test(s) && !/^(true|false|null|yes|no|on|off)$/i.test(s)) return s;
     return JSON.stringify(s);
   }
   function toYaml(meta) {
@@ -243,9 +244,26 @@
     return (raw) => { const n = safeName(unlink(raw)); return map.get(n.toLowerCase()) || n; };
   }
 
-  // Word overlap between two titles (0 = nothing shared, 1 = same words)
+  // Word overlap and similarity between notes and titles
   const STOP = new Set("the a an and or but to of for in on at by with about from my me i is be it this that need should would could will have has do".split(" "));
-  const words = (s) => new Set(String(s).toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w)));
+  function stem(w) {
+    if (w.length > 4) {
+      if (w.endsWith("ing")) return w.slice(0, -3);
+      if (w.endsWith("ies")) return w.slice(0, -3) + "y";
+      if (w.endsWith("ed")) return w.slice(0, -2);
+      if (w.endsWith("es")) return w.slice(0, -2);
+      if (w.endsWith("s") && !w.endsWith("ss")) return w.slice(0, -1);
+    }
+    return w;
+  }
+  const words = (s) => new Set(String(s).toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w)).map(stem));
+  function dice(a, b) {
+    const A = words(a), B = words(b);
+    if (!A.size || !B.size) return 0;
+    let both = 0;
+    A.forEach((w) => { if (B.has(w)) both++; });
+    return (2 * both) / (A.size + B.size);
+  }
   function overlap(a, b) {
     const A = words(a), B = words(b);
     if (!A.size || !B.size) return 0;
@@ -253,20 +271,20 @@
     A.forEach((w) => { if (B.has(w)) both++; });
     return both / (A.size + B.size - both);
   }
-  async function similar(title, { folders = NOTE_FOLDERS, min = 0.5, openTodosOnly = false } = {}) {
+  async function similar(title, { folders = NOTE_FOLDERS, min = 0.55, openTodosOnly = false } = {}) {
     let best = null;
     for (const n of await allNotes()) {
       if (!folders.includes(folderOf(n.path))) continue;
       if (openTodosOnly && n.meta.done) continue;
-      const score = overlap(title, n.title || n.name);
+      const score = dice(title, n.title || n.name);
       if (score >= min && (!best || score > best.score)) best = { path: n.path, name: n.name, score };
     }
     return best;
   }
   // A to-do you already have (the app should ask before keeping both)
-  const findDuplicateTodo = (title) => similar(title, { folders: ["todos"], openTodosOnly: true });
+  const findDuplicateTodo = (title) => similar(title, { folders: ["todos"], min: 0.55, openTodosOnly: true });
   // An idea or thought you said before (the new note links back to it)
-  const findRevisit = (title) => similar(title, { folders: ["ideas", "thoughts"] });
+  const findRevisit = (title) => similar(title, { folders: ["ideas", "thoughts"], min: 0.5 });
 
   // ---------- Saving ----------
   // Save a thought the AI pulled out (idea, note, question, task, reminder)

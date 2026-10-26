@@ -157,7 +157,7 @@ window.Screens.todo = {
       checkBtn.setAttribute("role", "checkbox");
       checkBtn.setAttribute("aria-checked", String(isDone));
       checkBtn.setAttribute("aria-label", `Mark "${n.name}" as ${isDone ? "not done" : "done"}`);
-      checkBtn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg>`;
+      checkBtn.innerHTML = `<span class="todo-check-circle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg></span>`;
 
       checkBtn.onclick = async (e) => {
         e.stopPropagation();

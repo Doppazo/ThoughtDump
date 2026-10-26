@@ -34,8 +34,44 @@ export async function GET(req: NextRequest) {
   try {
     const audio = await getAudio(uid, path);
     if (!audio) return NextResponse.json({ error: "Recording not found." }, { status: 404 });
+
+    const totalSize = audio.buf.length;
+    const contentType = audio.type || (path.endsWith(".m4a") ? "audio/mp4" : "audio/webm");
+    const rangeHeader = req.headers.get("range");
+
+    if (rangeHeader && rangeHeader.startsWith("bytes=")) {
+      const parts = rangeHeader.slice(6).split("-");
+      const start = parseInt(parts[0], 10) || 0;
+      const end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
+
+      if (start >= totalSize || end >= totalSize || start > end) {
+        return new NextResponse(null, {
+          status: 416,
+          headers: { "Content-Range": `bytes */${totalSize}` },
+        });
+      }
+
+      const chunk = audio.buf.subarray(start, end + 1);
+      return new NextResponse(new Uint8Array(chunk), {
+        status: 206,
+        headers: {
+          "Content-Range": `bytes ${start}-${end}/${totalSize}`,
+          "Accept-Ranges": "bytes",
+          "Content-Length": String(chunk.length),
+          "Content-Type": contentType,
+          "Cache-Control": "private, max-age=3600",
+        },
+      });
+    }
+
     return new NextResponse(new Uint8Array(audio.buf), {
-      headers: { "Content-Type": audio.type, "Cache-Control": "private, max-age=3600" },
+      status: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Content-Length": String(totalSize),
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "private, max-age=3600",
+      },
     });
   } catch (err) {
     console.error("audio read failed:", err);

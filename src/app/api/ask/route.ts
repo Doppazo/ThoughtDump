@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
     let compactIdeas;
     if (Array.isArray(body.notes)) {
-      compactIdeas = body.notes.slice(0, 200).map((n: any) => ({
+      compactIdeas = body.notes.slice(0, 500).map((n: any) => ({
         id: String(n.id || "").slice(0, 200),
         title: String(n.title || "").slice(0, 120),
         summary: String(n.summary || "").slice(0, 500),
