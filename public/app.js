@@ -1,5 +1,27 @@
 // Draws the floating tab bar and the gear, and shows one screen at a time.
 (function () {
+  // Register Service Worker for PWA
+  if ("serviceWorker" in navigator && window.location.protocol.startsWith("http")) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/sw.js").catch((err) => {
+        console.warn("ServiceWorker registration failed:", err);
+      });
+    });
+  }
+
+  // Global PWA install prompt handler
+  window.deferredInstallPrompt = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    window.deferredInstallPrompt = e;
+    window.dispatchEvent(new CustomEvent("pwa-installable"));
+  });
+
+  window.addEventListener("appinstalled", () => {
+    window.deferredInstallPrompt = null;
+    window.dispatchEvent(new CustomEvent("pwa-installed"));
+  });
+
   // The 5 tabs, in order: Ask, Brain, Capture (accentuated center), To-Do, Graph.
   // "id" must match a file in screens/.
   // "color" is the tab's highlight color (set in styles.css).

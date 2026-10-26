@@ -18,6 +18,8 @@ window.Screens.settings = {
     el.innerHTML = `
       <h1 class="screen-title">Settings</h1>
       <p class="screen-sub">Manage your vault files, downloads, and account.</p>
+      <h2 class="section-title">Mobile App</h2>
+      <div class="list" id="pwa-section"></div>
       <h2 class="section-title">Account</h2>
       <div class="list">
         <div class="row" style="cursor:default"><span class="row-main"><span class="row-name" id="acct-name"></span><span class="row-sub" id="acct-sub"></span></span></div>
@@ -33,6 +35,62 @@ window.Screens.settings = {
       <p class="capture-note" id="settings-note" role="status" aria-live="polite"></p>`;
     const view = el.querySelector("#vault-view");
     const note = el.querySelector("#settings-note");
+    const pwaSection = el.querySelector("#pwa-section");
+
+    // Mobile App (PWA) status and install actions
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+    function renderPwaStatus() {
+      if (!pwaSection) return;
+      pwaSection.innerHTML = "";
+      if (isStandalone) {
+        pwaSection.innerHTML = `
+          <div class="row" style="cursor:default">
+            <span class="row-main">
+              <span class="row-name">📱 Running as Home Screen App</span>
+              <span class="row-sub">Full-screen experience enabled. Fast local offline caching active.</span>
+            </span>
+          </div>`;
+      } else if (window.deferredInstallPrompt) {
+        pwaSection.innerHTML = `
+          <button class="row" type="button" id="pwa-install-btn">
+            <span class="row-main">
+              <span class="row-name">Install Thought Dump app</span>
+              <span class="row-sub">Add to your home screen for instant one-tap launch.</span>
+            </span>
+            <span class="row-right">↓</span>
+          </button>`;
+        pwaSection.querySelector("#pwa-install-btn")?.addEventListener("click", async () => {
+          if (!window.deferredInstallPrompt) return;
+          window.deferredInstallPrompt.prompt();
+          const { outcome } = await window.deferredInstallPrompt.userChoice;
+          if (outcome === "accepted") {
+            window.deferredInstallPrompt = null;
+            renderPwaStatus();
+          }
+        });
+      } else if (isIOS) {
+        pwaSection.innerHTML = `
+          <div class="row" style="cursor:default">
+            <span class="row-main">
+              <span class="row-name">Install on iPhone / iPad</span>
+              <span class="row-sub">Tap the <strong>Share</strong> button (square with arrow ↑) in Safari, then tap <strong>Add to Home Screen</strong>.</span>
+            </span>
+          </div>`;
+      } else {
+        pwaSection.innerHTML = `
+          <div class="row" style="cursor:default">
+            <span class="row-main">
+              <span class="row-name">Install on your phone</span>
+              <span class="row-sub">Open this site on your mobile phone and tap "Add to Home Screen" to install it.</span>
+            </span>
+          </div>`;
+      }
+    }
+    renderPwaStatus();
+    window.addEventListener("pwa-installable", renderPwaStatus);
+    window.addEventListener("pwa-installed", renderPwaStatus);
 
     // Account
     const u = Auth.user || {};

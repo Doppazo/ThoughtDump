@@ -1,5 +1,13 @@
-const CACHE_NAME = "thoughtdump-light-v3";
-const STATIC_ASSETS = ["/", "/quick", "/manifest.webmanifest"];
+const CACHE_NAME = "thoughtdump-pwa-v1";
+const STATIC_ASSETS = [
+  "/",
+  "/manifest.webmanifest",
+  "/styles.css",
+  "/icon.svg",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/apple-touch-icon.png",
+];
 
 // Install: Pre-cache static shell
 self.addEventListener("install", (event) => {
@@ -11,7 +19,7 @@ self.addEventListener("install", (event) => {
   );
 });
 
-// Activate: Immediately purge all legacy caches (thinkbox-v1, old dark builds)
+// Activate: Immediately purge all legacy caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -27,7 +35,7 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Fetch: NETWORK-FIRST strategy to guarantee fresh light-mode pages on localhost
+// Fetch: NETWORK-FIRST strategy to guarantee fresh updates
 self.addEventListener("fetch", (event) => {
   // Let API requests pass straight through to the network
   if (event.request.url.includes("/api/")) {
